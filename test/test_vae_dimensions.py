@@ -1,0 +1,62 @@
+from vae.vae_architecture import VAE
+import torch
+
+
+input_channels = 3
+hidden_dimensions = 16
+latent_dimensions = 4
+model = VAE(
+    input_channels=input_channels,
+    hidden_dimensions=hidden_dimensions,
+    latent_dimensions=latent_dimensions,
+)
+
+
+def test_vae_reconstruction_dimensions():
+    model_input = torch.randn(1, 3, 256, 256)
+
+    # Get model output
+    reconstruction, mu, logvar = model(model_input)
+
+    assert (
+        reconstruction.shape == model_input.shape
+    ), "Reconstruction does not match input dimensions"
+    assert (
+        mu.shape == logvar.shape
+    ), f"Mu and logvar don't have the same shape| mu: {mu.shape}, logvar: {logvar.shape}"
+    assert mu.shape == (1, 4, 16, 16), f"Mu shape is not (1,4,16,16), got {mu.shape}"
+
+
+def test_vae_mu_dimensions():
+    model_input = torch.randn(1, 3, 256, 256)
+
+    # Get model output
+    reconstruction, mu, logvar = model(model_input)
+    assert mu.shape == (1, 4, 16, 16), f"Mu shape is not (1,4,16,16), got {mu.shape}"
+
+
+def test_vae_logvar_dimensions():
+    model_input = torch.randn(1, 3, 256, 256)
+
+    # Get model output
+    reconstruction, mu, logvar = model(model_input)
+    assert logvar.shape == (
+        1,
+        4,
+        16,
+        16,
+    ), f"logvar shape is not (1,4,16,16), got {logvar.shape}"
+
+
+def test_vae_mu_logvar_dimensions_equal():
+    model_input = torch.randn(1, 3, 256, 256)
+
+    # Get model output
+    reconstruction, mu, logvar = model(model_input)
+    assert (
+        mu.shape == logvar.shape
+    ), f"Mu and logvar don't have the same shape| mu: {mu.shape}, logvar: {logvar.shape}"
+
+
+if __name__ == "__main__":
+    pass
