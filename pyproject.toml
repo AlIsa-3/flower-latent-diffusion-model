@@ -10,3 +10,10 @@ dependencies = ["torch","torchvision","numpy","matplotlib","pillow","ipykernel"]
 readme = "README.md"
 
 dynamic = ["version"]
+
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
