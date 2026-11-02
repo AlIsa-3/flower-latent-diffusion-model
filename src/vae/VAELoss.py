@@ -13,10 +13,10 @@ class VAELoss(nn.Module):
         self.beta = beta
 
     def _KL_divergence(self, mu, logvar):
-        return 0.5 * torch.sum(1 + logvar - (mu**2) - torch.exp(logvar))
+        return -0.5 * torch.sum(1 + logvar - (mu**2) - torch.exp(logvar)) / mu.shape[0]
 
     def _reconstruction_loss(self, reconstruction, original):
-        return F.mse_loss(reconstruction, original, reduction="sum")
+        return F.mse_loss(reconstruction, original, reduction="sum") / original.shape[0]
 
     def forward(self, vae_output: tuple, original_input):
         reconstruction, mu, logvar = vae_output
@@ -24,7 +24,6 @@ class VAELoss(nn.Module):
         reconstruction_loss = self._reconstruction_loss(reconstruction, original_input)
         kl_divergence = self._KL_divergence(mu, logvar)
 
-        #       Reconstruction                    KL Divergence averaged over the batch
-        return reconstruction_loss + self.beta * (
-            kl_divergence / original_input.shape[0]
-        )
+        total_loss = reconstruction_loss + (self.beta * kl_divergence)
+
+        return total_loss , kl_divergence, reconstruction_loss

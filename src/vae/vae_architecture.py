@@ -13,7 +13,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions),
             nn.ReLU(),
             # 128x128
             nn.Conv2d(
@@ -22,7 +22,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions * 2),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions * 2),
             nn.ReLU(),
             # 64x64
             nn.Conv2d(
@@ -31,7 +31,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions * 4),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions * 4),
             nn.ReLU(),
             # 32x32
             nn.Conv2d(
@@ -40,7 +40,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions * 8),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions * 8),
             nn.ReLU(),
             # 16x16
         )
@@ -64,7 +64,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions * 4),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions * 4),
             nn.ReLU(),
             # 32x32
             nn.ConvTranspose2d(
@@ -73,7 +73,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions * 2),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions * 2),
             nn.ReLU(),
             # 64x64
             nn.ConvTranspose2d(
@@ -82,7 +82,7 @@ class VAE(nn.Module):
                 kernel_size=(2, 2),
                 stride=2,
             ),
-            nn.BatchNorm2d(hidden_dimensions),
+            nn.GroupNorm(num_groups=8,num_channels=hidden_dimensions),
             nn.ReLU(),
             # 128x128
             nn.ConvTranspose2d(
@@ -98,7 +98,7 @@ class VAE(nn.Module):
     def encode(self, x):
         h = self.encoder(x)
         mu = self.to_mu(h)
-        logvar = self.to_logvar(h)
+        logvar = torch.clamp(self.to_logvar(h),min=-20,max=20)
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
