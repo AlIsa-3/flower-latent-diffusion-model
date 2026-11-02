@@ -1,0 +1,58 @@
+from vae.VAELoss import VAELoss
+import torch
+
+# Standard VAE Loss
+loss = VAELoss(beta=1)
+
+generator = torch.manual_seed(453)
+
+mu = 0
+var = 1
+logvar = torch.log(torch.tensor(var))
+
+original = torch.randn((1, 3, 256, 256), generator=generator)
+reconstruction = original.clone()
+
+
+def test_KL_divergence():
+    assert (
+        loss._KL_divergence(mu, logvar) == 0
+    ), "KL Divergence should be 0 when mu and logvar are normal"
+
+
+def test_KL_divergence_non_normal():
+    assert (
+        loss._KL_divergence(torch.tensor(3), torch.tensor(1)) != 0
+    ), f"KL Divergence should not be 0 with non normal mu, logvar. Got: {mu = }, {logvar = }"
+
+
+def test_reconstruction_loss_identical():
+    assert (
+        loss._reconstruction_loss(reconstruction, original) == 0
+    ), "Reconstruction loss should be 0 with identical reconstruction"
+
+
+def test_reconstruction_loss():
+    assert (
+        loss._reconstruction_loss(
+            torch.randn_like(original, generator=generator), original
+        )
+        != 0
+    ), "Reconstruction loss should not be 0 with non identical reconstruction"
+
+
+def test_vae_loss_kl():
+    # Identical reconstruction but non normal mu and logvar
+    mu = torch.tensor(5)
+    logvar = torch.tensor(5)
+    assert (
+        loss((reconstruction, mu, logvar), original) != 0
+    ), f"VAE Loss should not be 0 with non normal mu and logvar {mu = },{logvar = }"
+
+
+def test_vae_loss_reconstruction():
+    # Normal mu and logvar but non identical reconstruction
+    assert (
+        loss((torch.randn_like(original, generator=generator), mu, logvar), original)
+        != 0
+    ), "VAE loss should not be 0 with non identical reconstruction"
