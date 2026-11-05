@@ -4,6 +4,19 @@ import pathlib
 import torch
 from typing import Literal
 from vae.vae_architecture import VAE
+import torchvision.transforms.v2 as v2
+
+# VAE Preprocessing Transforms
+vae_preprocess_transforms = v2.Compose(
+    [
+        v2.ToImage(),
+        v2.Resize((256, 256)),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(
+            mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
+        ),  # Scale to [-1,1] for Tanh activation in VAE decoder
+    ]
+)
 
 
 def unNormalize(image, mean, std):

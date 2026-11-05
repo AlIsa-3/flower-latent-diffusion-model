@@ -22,17 +22,11 @@ class FlattenedImageFolder(data.Dataset):
     def __len__(self):
         return len(self.image_paths)
 
-
     def __getitem__(self, index) -> Image.Image:
         image_path = self.image_paths[index]
-        image = Image.open(image_path).convert('RGB')
+        image = Image.open(image_path).convert("RGB")
 
         if self.transform:
             image = self.transform(image)
 
         return image
-
-
-    
-
-        

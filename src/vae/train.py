@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
-from vae.vae_utils import EarlyStop
+from vae.vae_utils import EarlyStop, vae_preprocess_transforms
 
 from typing import Literal
 
@@ -131,9 +131,13 @@ def training_loop(
     train_data: data.DataLoader,
     val_data: data.DataLoader,
     num_epochs: int = 10,
-    early_stop: EarlyStop = EarlyStop(),
+    early_stop: EarlyStop | None = None ,
     device: Literal["cpu", "mps", "cuda"] = "cpu",
 ) -> tuple[LossHistories, LatentStatistics]:
+
+    if early_stop is None:
+        early_stop = EarlyStop()
+    
     losses: dict[str, defaultdict[str, list[float]]] = {
         "train": defaultdict(list),
         "validation": defaultdict(list),
@@ -203,19 +207,8 @@ if __name__ == "__main__":
     BATCH_SIZE = 8
     RANDOM_SEED = 423
 
-    transforms = v2.Compose(
-        [
-            v2.ToImage(),
-            v2.Resize((256, 256)),
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(
-                mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
-            ),  # Scale to [-1,1] for Tanh activation in VAE decoder
-        ]
-    )
-
     path = pathlib.Path("flattened_dataset")
-    dataset = FlattenedImageFolder(path, transform=transforms)
+    dataset = FlattenedImageFolder(path, transform=vae_preprocess_transforms)
 
     train_data, val_data, test_data = data.random_split(
         dataset, lengths=[0.8, 0.1, 0.1], generator=torch.manual_seed(RANDOM_SEED)

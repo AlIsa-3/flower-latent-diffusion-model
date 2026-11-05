@@ -1,6 +1,8 @@
 import pathlib
 import shutil
 import os
+
+
 def flatten_directory(
     path: pathlib.Path, new_path: pathlib.Path, file_extension: str = "jpg"
 ):
