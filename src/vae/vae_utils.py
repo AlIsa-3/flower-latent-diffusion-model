@@ -125,3 +125,14 @@ class EarlyStop:
             "patience": self.patience,
             "early_stop": self.early_stop,
         }
+
+
+def kl_per_channel(mus, logvars):
+    kl = -0.5 * (1 + logvars - mus.pow(2) - logvars.exp())
+
+    # Only want channels
+    kl = kl.sum(dim=(0, 2, 3))
+
+    # Average over the number of samples
+    kl /= mus.size(0)
+    return kl

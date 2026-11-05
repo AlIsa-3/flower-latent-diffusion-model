@@ -1,19 +1,18 @@
 import torch.utils.data as data
 import torch.optim as optim
-import torchvision.transforms.v2 as v2
 import torch
 import time
 from collections import defaultdict
 
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
-from vae.vae_utils import EarlyStop, vae_preprocess_transforms
+from vae.vae_utils import EarlyStop, vae_preprocess_transforms, kl_per_channel
 
 from typing import Literal
 
 type LossTuple = tuple[float, float, float]
 type LossHistories = dict[str, defaultdict[str, list[float]]]
-type LatentStatistics = list[dict[str, float]]
+type LatentStatistics = dict[str, float | list[float]]
 
 
 def train(
@@ -54,7 +53,7 @@ def validate(
     criterion: VAELoss,
     loader: data.DataLoader,
     device: Literal["cpu", "mps", "cuda"] = "cpu",
-) -> tuple[LossTuple, dict[str, float]]:
+) -> tuple[LossTuple, LatentStatistics]:
     model.eval()
 
     val_loss = val_kl_divergence = val_reconstruction_loss = 0.0
@@ -98,29 +97,46 @@ def validate(
         logvar_mean = epoch_logvars.mean().item()
         logvar_std = epoch_logvars.std().item()
 
+        # Calculate per-channel statistics  (only want the channels)
+        mu_channel_mean = epoch_mus.mean(dim=(0, 2, 3))
+        mu_channel_std = epoch_mus.std(dim=(0, 2, 3))
+
+        logvar_channel_mean = epoch_logvars.mean(dim=(0, 2, 3))
+        logvar_channel_std = epoch_logvars.std(dim=(0, 2, 3))
+
+        channel_kls = kl_per_channel(epoch_mus, epoch_logvars)
+
         latent_statistics = {
             "mu_mean": mu_mean,
             "mu_std": mu_std,
             "logvar_mean": logvar_mean,
             "logvar_std": logvar_std,
+            "mu_channel_mean": mu_channel_mean.tolist(),
+            "mu_channel_std": mu_channel_std.tolist(),
+            "logvar_channel_mean": logvar_channel_mean.tolist(),
+            "logvar_channel_std": logvar_channel_std.tolist(),
+            "kl_per_channel": channel_kls.tolist(),
         }
 
-        return (val_loss, val_kl_divergence, val_reconstruction_loss), latent_statistics
+    return (val_loss, val_kl_divergence, val_reconstruction_loss), latent_statistics
 
 
 def print_epoch_results(
     epoch: int,
     train_losses: LossTuple,
     validation_losses: LossTuple,
-    latent_statistics: dict[str, float],
+    latent_statistics: LatentStatistics,
     elapsed_time: float,
 ) -> None:
     print(
         f"Epoch {epoch+1}: Time Elapsed = {elapsed_time:.3f}\n\n"
         f"Training: Loss = {train_losses[0]:.3f} | KL = {train_losses[1]:.3f} | Reconstruction = {train_losses[2]:.3f}\n"
-        f"Validation: Loss = {validation_losses[0]:.3f} | KL = {validation_losses[1]:.3f} | Reconstruction = {validation_losses[2]:.3f}\n\n"
-        f"Latent Statistics:\nMu:\nMean: {latent_statistics['mu_mean']:.4f} | std: {latent_statistics['mu_std']:.4f}\n"
-        f"Logvar:\nMean: {latent_statistics['logvar_mean']:.4f} | std: {latent_statistics['logvar_std']:.4f}\n\n"
+        f"Validation: Loss = {validation_losses[0]:.3f} | KL = {validation_losses[1]:.3f} | Reconstruction = {validation_losses[2]:.3f}\n"
+        f"KL Divergence Per Channel: {latent_statistics['kl_per_channel']}\n"
+        f"Latent Statistics:\nMu:\nMean = {latent_statistics['mu_mean']:.4f} | std = {latent_statistics['mu_std']:.4f}\n"
+        f"Channel Mu:\nMean = {latent_statistics['mu_channel_mean']:.4f} | std = {latent_statistics['mu_channel_std']:.4f}\n"
+        f"Logvar:\nMean = {latent_statistics['logvar_mean']:.4f} | std = {latent_statistics['logvar_std']:.4f}\n"
+        f"Channel Logvar:\nMean = {latent_statistics['logvar_channel_mean']:.4f} | std = {latent_statistics['logvar_channel_std']:.4f}\n\n"
     )
 
 
@@ -131,18 +147,17 @@ def training_loop(
     train_data: data.DataLoader,
     val_data: data.DataLoader,
     num_epochs: int = 10,
-    early_stop: EarlyStop | None = None ,
+    early_stop: EarlyStop | None = None,
     device: Literal["cpu", "mps", "cuda"] = "cpu",
-) -> tuple[LossHistories, LatentStatistics]:
-
+) -> tuple[LossHistories, list[LatentStatistics]]:
     if early_stop is None:
         early_stop = EarlyStop()
-    
+
     losses: dict[str, defaultdict[str, list[float]]] = {
         "train": defaultdict(list),
         "validation": defaultdict(list),
     }
-    epoch_latent_statistics: list[dict[str, float]] = []
+    epoch_latent_statistics: list[LatentStatistics] = []
 
     for epoch in range(num_epochs):
         if device == "mps":
