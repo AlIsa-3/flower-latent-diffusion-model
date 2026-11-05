@@ -1,6 +1,5 @@
 import torch.utils.data as data
 import torch.optim as optim
-import torch.nn as nn
 import torchvision.transforms.v2 as v2
 import torch
 import time
@@ -8,6 +7,7 @@ from collections import defaultdict
 
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
+from vae.vae_utils import EarlyStop
 
 from typing import Literal
 
@@ -131,6 +131,7 @@ def training_loop(
     train_data: data.DataLoader,
     val_data: data.DataLoader,
     num_epochs: int = 10,
+    early_stop: EarlyStop = EarlyStop(),
     device: Literal["cpu", "mps", "cuda"] = "cpu",
 ) -> tuple[LossHistories, LatentStatistics]:
     losses: dict[str, defaultdict[str, list[float]]] = {
@@ -171,6 +172,20 @@ def training_loop(
             epoch_finish - epoch_start,
         )
 
+        # Check Early Stopping
+        should_stop = early_stop(
+            metric=validation_losses[0],  # Use total validation loss as the metric
+            model=model,
+            epoch=epoch + 1,
+            optimizer=optimizer,
+        )
+
+        print(early_stop.status())
+
+        if should_stop:
+            print(f"Early stopping triggered at epoch {epoch+1}")
+            break
+
     return losses, epoch_latent_statistics
 
 
@@ -205,12 +220,19 @@ if __name__ == "__main__":
     train_data, val_data, test_data = data.random_split(
         dataset, lengths=[0.8, 0.1, 0.1], generator=torch.manual_seed(RANDOM_SEED)
     )
-    train_loader = data.DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader = data.DataLoader(
+        train_data,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        generator=torch.manual_seed(RANDOM_SEED),
+    )
     val_loader = data.DataLoader(val_data, batch_size=BATCH_SIZE)
 
     model = VAE(input_channels=3, hidden_dimensions=32, latent_dimensions=8).to(device)
     criterion = VAELoss(beta=1).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    early_stop = EarlyStop(patience=10, min_delta=100, checkpoint_path="best_vae.ckpt")
 
     losses = training_loop(
         model,
@@ -219,8 +241,6 @@ if __name__ == "__main__":
         train_loader,
         val_loader,
         num_epochs=50,
+        early_stop=early_stop,
         device=device,
     )
-
-    cpu_dict = {k: v.cpu() for k, v in model.state_dict().items()}
-    torch.save(cpu_dict, "vae_params_cpu.pth")
