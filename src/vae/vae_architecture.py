@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from utils.ResidualBlock import ResidualBlock
 
 
 class VAE(nn.Module):
@@ -17,6 +18,8 @@ class VAE(nn.Module):
             ),
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions),
             nn.SiLU(),
+            ResidualBlock(hidden_dimensions),
+            ResidualBlock(hidden_dimensions),
             # 128x128
             nn.Conv2d(
                 in_channels=hidden_dimensions,
@@ -26,6 +29,8 @@ class VAE(nn.Module):
             ),
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions * 2),
             nn.SiLU(),
+            ResidualBlock(hidden_dimensions * 2),
+            ResidualBlock(hidden_dimensions * 2),
             # 64x64
             nn.Conv2d(
                 in_channels=hidden_dimensions * 2,
@@ -35,6 +40,8 @@ class VAE(nn.Module):
             ),
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions * 4),
             nn.SiLU(),
+            ResidualBlock(hidden_dimensions * 4),
+            ResidualBlock(hidden_dimensions * 4),
             # 32x32
         )
         # Convert Encoded Data to mu and logvar
@@ -45,12 +52,18 @@ class VAE(nn.Module):
             4 * hidden_dimensions, latent_dimensions, kernel_size=(3, 3), padding=1
         )
 
-        self.decoder_input = nn.Conv2d(
-            latent_dimensions, hidden_dimensions * 4, kernel_size=(3, 3), padding=1
+        self.decoder_input = nn.Sequential(
+            nn.Conv2d(
+                latent_dimensions, hidden_dimensions * 4, kernel_size=(3, 3), padding=1
+            ),
+            ResidualBlock(hidden_dimensions * 4),
+            ResidualBlock(hidden_dimensions * 4),
         )
 
         self.decoder = nn.Sequential(
             # 32x32
+            ResidualBlock(hidden_dimensions * 4),
+            ResidualBlock(hidden_dimensions * 4),
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions * 4,
                 out_channels=hidden_dimensions * 2,
@@ -59,6 +72,8 @@ class VAE(nn.Module):
             ),
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions * 2),
             nn.SiLU(),
+            ResidualBlock(hidden_dimensions * 2),
+            ResidualBlock(hidden_dimensions * 2),
             # 64x64
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions * 2,
@@ -68,6 +83,8 @@ class VAE(nn.Module):
             ),
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions),
             nn.SiLU(),
+            ResidualBlock(hidden_dimensions),
+            ResidualBlock(hidden_dimensions),
             # 128x128
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions,
