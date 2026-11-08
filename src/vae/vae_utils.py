@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
+import os
+import logging
+from datetime import datetime
 import torch
 from typing import Literal
 from vae.vae_architecture import VAE
@@ -60,7 +63,7 @@ class EarlyStop:
         self,
         patience: int = 10,
         min_delta: float = 10,
-        checkpoint_path: str = "best_model.ckpt",
+        checkpoint_path: str | os.PathLike = "best_model.ckpt",
     ):
         if patience < 1:
             raise ValueError("patience must be >= 1")
@@ -127,7 +130,7 @@ class EarlyStop:
         }
 
 
-def kl_per_channel(mus, logvars):
+def kl_per_channel(mus: torch.Tensor, logvars: torch.Tensor):
     kl = -0.5 * (1 + logvars - mus.pow(2) - logvars.exp())
 
     # Only want channels
@@ -136,3 +139,21 @@ def kl_per_channel(mus, logvars):
     # Average over the number of samples
     kl /= mus.size(0)
     return kl
+
+
+def setup_logger(
+    NUM_HIDDEN_DIM: int, NUM_LATENT_DIM: int, LR: float, LOSS_BETA: int
+) -> logging.Logger:
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("checkpoints", exist_ok=True)
+
+    logs_filename = f"logs/{timestamp}_hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.FileHandler(logs_filename)],
+    )
+    logger = logging.getLogger("TrainingLogger")
+    return logger
