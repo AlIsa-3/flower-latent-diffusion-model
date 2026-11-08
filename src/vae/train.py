@@ -3,7 +3,6 @@ import torch.optim as optim
 import torch
 import time
 import logging
-from warnings import deprecated
 from collections import defaultdict
 
 from vae.vae_architecture import VAE
@@ -127,26 +126,6 @@ def validate(
         }
 
     return (val_loss, val_kl_divergence, val_reconstruction_loss), latent_statistics
-
-
-@deprecated("replaced by log_epoch_results() and will be removed")
-def print_epoch_results(
-    epoch: int,
-    train_losses: LossTuple,
-    validation_losses: LossTuple,
-    latent_statistics: LatentStatistics,
-    elapsed_time: float,
-) -> None:
-    print(
-        f"Epoch {epoch+1}: Time Elapsed = {elapsed_time:.3f}\n\n"
-        f"Training: Loss = {train_losses[0]:.3f} | KL = {train_losses[1]:.3f} | Reconstruction = {train_losses[2]:.3f}\n"
-        f"Validation: Loss = {validation_losses[0]:.3f} | KL = {validation_losses[1]:.3f} | Reconstruction = {validation_losses[2]:.3f}\n"
-        f"KL Divergence Per Channel: {latent_statistics['kl_per_channel']}\n"
-        f"Latent Statistics:\nMu:\nMean = {latent_statistics['mu_mean']:.4f} | std = {latent_statistics['mu_std']:.4f}\n"
-        f"Channel Mu:\nMean = {latent_statistics['mu_channel_mean']:.4f} | std = {latent_statistics['mu_channel_std']:.4f}\n"
-        f"Logvar:\nMean = {latent_statistics['logvar_mean']:.4f} | std = {latent_statistics['logvar_std']:.4f}\n"
-        f"Channel Logvar:\nMean = {latent_statistics['logvar_channel_mean']:.4f} | std = {latent_statistics['logvar_channel_std']:.4f}\n\n"
-    )
 
 
 def log_epoch_results(
