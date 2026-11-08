@@ -39,16 +39,23 @@ class ConvolutionBlock(nn.Module):
 
 
 class UNet(nn.Module):
+    latent_scaling_factor: torch.Tensor
+
     def __init__(
         self,
         input_latent_channels: int,
         hidden_dimensions: int = 16,
         timestep_embedding_dims: int = 256,
+        latent_scaling_factor: torch.Tensor | None = None,
     ) -> None:
         super().__init__()
 
         if hidden_dimensions % 8 != 0:
             raise ValueError("hidden_dimensions must be divisible by 8")
+
+        if latent_scaling_factor is None:
+            latent_scaling_factor = torch.tensor(1)
+        self.register_buffer("latent_scaling_factor", latent_scaling_factor)
 
         # Allow model to learn a more useful representation of the timestep embedding
         self.timestep_embedding = nn.Sequential(
