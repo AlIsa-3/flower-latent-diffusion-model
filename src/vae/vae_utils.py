@@ -1,8 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-import logging
-from datetime import datetime
 import torch
 from typing import Literal
 from vae.vae_architecture import VAE
@@ -68,27 +65,3 @@ def kl_per_channel(mus: torch.Tensor, logvars: torch.Tensor):
     # Average over the number of samples
     kl /= mus.size(0)
     return kl
-
-
-def setup_logger(
-    NUM_HIDDEN_DIM: int,
-    NUM_LATENT_DIM: int,
-    LR: float,
-    LOSS_BETA: int,
-    filename: str | None = None,
-) -> logging.Logger:
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    os.makedirs("logs", exist_ok=True)
-    os.makedirs("checkpoints", exist_ok=True)
-
-    if filename is None:
-        filename = f"hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}"
-    logs_filename = f"logs/{timestamp}_{filename}.log"
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.FileHandler(logs_filename)],
-    )
-    logger = logging.getLogger("TrainingLogger")
-    return logger

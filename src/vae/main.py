@@ -4,9 +4,10 @@ import torch
 import torch.utils.data as data
 import torch.optim as optim
 
-from vae.vae_utils import vae_preprocess_transforms, setup_logger
+from vae.vae_utils import vae_preprocess_transforms
 from utils.ImageLoader import FlattenedImageFolder
 from utils import utils
+from utils.logger import setup_logger
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
 from vae.train import training_loop
@@ -41,8 +42,9 @@ def main():
     EARLY_STOP_MIN_DELTA = 100
 
     BATCH_SIZE = 8
-
-    logger = setup_logger(NUM_HIDDEN_DIM, NUM_LATENT_DIM, LR, LOSS_BETA)
+    logger = setup_logger(
+        f"hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}"
+    )
     path = pathlib.Path("flattened_dataset")
     dataset = FlattenedImageFolder(path, transform=vae_preprocess_transforms)
 
