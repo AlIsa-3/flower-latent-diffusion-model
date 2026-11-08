@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class CosineNoiseScheduler(nn.Module):
@@ -55,3 +56,27 @@ class CosineNoiseScheduler(nn.Module):
         noisy_latents = self._forward_diffusion(latents, alpha_bar, noise)
 
         return noisy_latents
+
+
+class SinusoidalTimestepEmbedding(nn.Module):
+    def __init__(self, embedding_dimensions: int = 64):
+        super().__init__()
+        self.embedding_dimensions = embedding_dimensions
+
+    def forward(self, timesteps, FREQUENCY_RANGE: int = 10000):
+        # Half because have both sin and cos
+        half_dimensions = self.embedding_dimensions // 2
+
+        # Calculate frequencies to use --> can model time changes better
+        frequencies = torch.exp(
+            -np.log(FREQUENCY_RANGE)
+            * torch.arange(
+                half_dimensions, device=timesteps.device, dtype=torch.float32
+            )
+            / half_dimensions
+        )
+
+        angles = timesteps.float().unsqueeze(1) * frequencies.unsqueeze(0)
+
+        embeddings = torch.cat([torch.sin(angles), torch.cos(angles)], dim=1)
+        return embeddings
