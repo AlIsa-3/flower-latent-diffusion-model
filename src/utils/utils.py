@@ -34,7 +34,7 @@ class EarlyStop:
         self.min_delta = min_delta
         self.checkpoint_path = pathlib.Path(checkpoint_path)
         # Create parent directories if they don't exist
-        self.checkpoint_path.mkdir(parents=True, exist_ok=True)
+        self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
         self.best_metric = float("inf")
 
