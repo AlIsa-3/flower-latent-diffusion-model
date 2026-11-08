@@ -6,9 +6,10 @@ loss = VAELoss(beta=1)
 
 generator = torch.manual_seed(453)
 
-mu = 0
-var = 1
-logvar = torch.log(torch.tensor(var))
+# Values need to be an array for the loss function to work
+mu = torch.tensor(0).unsqueeze(0)
+var = torch.tensor(1).unsqueeze(0)
+logvar = torch.log(var)
 
 original = torch.randn((1, 3, 256, 256), generator=generator)
 reconstruction = original.clone()
@@ -22,7 +23,8 @@ def test_KL_divergence():
 
 def test_KL_divergence_non_normal():
     assert (
-        loss._KL_divergence(torch.tensor(3), torch.tensor(1)) != 0
+        loss._KL_divergence(torch.tensor(3).unsqueeze(0), torch.tensor(1).unsqueeze(0))
+        != 0
     ), f"KL Divergence should not be 0 with non normal mu, logvar. Got: {mu = }, {logvar = }"
 
 
@@ -43,8 +45,8 @@ def test_reconstruction_loss():
 
 def test_vae_loss_kl():
     # Identical reconstruction but non normal mu and logvar
-    mu = torch.tensor(5)
-    logvar = torch.tensor(5)
+    mu = torch.tensor(5).unsqueeze(0)
+    logvar = torch.tensor(5).unsqueeze(0)
     assert (
         loss((reconstruction, mu, logvar), original) != 0
     ), f"VAE Loss should not be 0 with non normal mu and logvar {mu = },{logvar = }"

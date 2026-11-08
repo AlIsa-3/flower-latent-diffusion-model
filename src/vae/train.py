@@ -2,6 +2,8 @@ import torch.utils.data as data
 import torch.optim as optim
 import torch
 import time
+import logging
+from warnings import deprecated
 from collections import defaultdict
 
 from vae.vae_architecture import VAE
@@ -13,6 +15,12 @@ from typing import Literal
 type LossTuple = tuple[float, float, float]
 type LossHistories = dict[str, defaultdict[str, list[float]]]
 type LatentStatistics = dict[str, float | list[float]]
+
+
+def _get_logger() -> logging.Logger:
+    logger = logging.getLogger("ModelTrainingLogger")
+    logger.addHandler(logging.NullHandler())
+    return logger
 
 
 def train(
@@ -121,6 +129,7 @@ def validate(
     return (val_loss, val_kl_divergence, val_reconstruction_loss), latent_statistics
 
 
+@deprecated("replaced by log_epoch_results() and will be removed")
 def print_epoch_results(
     epoch: int,
     train_losses: LossTuple,
@@ -140,6 +149,26 @@ def print_epoch_results(
     )
 
 
+def log_epoch_results(
+    epoch: int,
+    train_losses: LossTuple,
+    validation_losses: LossTuple,
+    latent_statistics: LatentStatistics,
+    elapsed_time: float,
+    logger: logging.Logger,
+) -> None:
+    logger.info(
+        f"\nEpoch {epoch+1}: Time Elapsed = {elapsed_time:.3f}\n\n"
+        f"Training: Loss = {train_losses[0]:.3f} | KL = {train_losses[1]:.3f} | Reconstruction = {train_losses[2]:.3f}\n"
+        f"Validation: Loss = {validation_losses[0]:.3f} | KL = {validation_losses[1]:.3f} | Reconstruction = {validation_losses[2]:.3f}\n"
+        f"KL Divergence Per Channel: {latent_statistics['kl_per_channel']}\n"
+        f"Latent Statistics:\nMu:\n Mean = {latent_statistics['mu_mean']:.4f} | std = {latent_statistics['mu_std']:.4f}\n"
+        f"Channel Mu:\nMean = {latent_statistics['mu_channel_mean']}\nstd = {latent_statistics['mu_channel_std']}\n"
+        f"Logvar:\n Mean = {latent_statistics['logvar_mean']:.4f} | std = {latent_statistics['logvar_std']:.4f}\n"
+        f"Channel Logvar:\nMean = {latent_statistics['logvar_channel_mean']}\nstd = {latent_statistics['logvar_channel_std']}\n\n"
+    )
+
+
 def training_loop(
     model: VAE,
     criterion: VAELoss,
@@ -149,7 +178,11 @@ def training_loop(
     num_epochs: int = 10,
     early_stop: EarlyStop | None = None,
     device: Literal["cpu", "mps", "cuda"] = "cpu",
+    logger: logging.Logger | None = None,
 ) -> tuple[LossHistories, list[LatentStatistics]]:
+    if logger is None:
+        logger = _get_logger()
+
     if early_stop is None:
         early_stop = EarlyStop()
 
@@ -159,11 +192,19 @@ def training_loop(
     }
     epoch_latent_statistics: list[LatentStatistics] = []
 
+    logger.info(f"Beginning Training with {num_epochs} Epochs")
+    logger.info(
+        f"Early Stopping Criteria: Patience = {early_stop.patience} | Minimum Delta = {early_stop.min_delta}"
+    )
     for epoch in range(num_epochs):
+        logger.info(f"Epoch {epoch+1}")
         if device == "mps":
             torch.mps.synchronize()
         epoch_start = time.perf_counter()
+
+        logger.info("Training Start")
         train_losses = train(model, criterion, optimizer, train_data, device)
+        logger.info("Training Finished")
 
         # Keep track of epoch training losses
         losses["train"]["loss"].append(train_losses[0])
@@ -171,9 +212,11 @@ def training_loop(
         losses["train"]["reconstruction_loss"].append(train_losses[2])
 
         # Keep track of validation losses and statistics
+        logger.info("Validation Start")
         validation_losses, latent_statistics = validate(
             model, criterion, val_data, device
         )
+        logger.info("Validation Finished")
         losses["validation"]["loss"].append(validation_losses[0])
         losses["validation"]["kl_divergence"].append(validation_losses[1])
         losses["validation"]["reconstruction_loss"].append(validation_losses[2])
@@ -183,12 +226,13 @@ def training_loop(
             torch.mps.synchronize()
         epoch_finish = time.perf_counter()
 
-        print_epoch_results(
+        log_epoch_results(
             epoch,
             train_losses,
             validation_losses,
             latent_statistics,
             epoch_finish - epoch_start,
+            logger,
         )
 
         # Check Early Stopping
@@ -199,12 +243,12 @@ def training_loop(
             optimizer=optimizer,
         )
 
-        print(early_stop.status())
+        logger.info(early_stop.status())
 
         if should_stop:
-            print(f"Early stopping triggered at epoch {epoch+1}")
+            logger.info(f"Early stopping triggered at epoch {epoch+1}")
             break
-
+    logger.info("Finished Model Training")
     return losses, epoch_latent_statistics
 
 
