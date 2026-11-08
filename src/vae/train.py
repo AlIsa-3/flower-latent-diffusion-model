@@ -7,19 +7,14 @@ from collections import defaultdict
 
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
-from vae.vae_utils import EarlyStop, vae_preprocess_transforms, kl_per_channel
+from vae.vae_utils import EarlyStop, kl_per_channel
+from utils.logger import get_null_logger
 
 from typing import Literal
 
 type LossTuple = tuple[float, float, float]
 type LossHistories = dict[str, defaultdict[str, list[float]]]
 type LatentStatistics = dict[str, float | list[float]]
-
-
-def _get_logger() -> logging.Logger:
-    logger = logging.getLogger("ModelTrainingLogger")
-    logger.addHandler(logging.NullHandler())
-    return logger
 
 
 def train(
@@ -160,7 +155,7 @@ def training_loop(
     logger: logging.Logger | None = None,
 ) -> tuple[LossHistories, list[LatentStatistics]]:
     if logger is None:
-        logger = _get_logger()
+        logger = get_null_logger()
 
     if early_stop is None:
         early_stop = EarlyStop()
@@ -229,49 +224,3 @@ def training_loop(
             break
     logger.info("Finished Model Training")
     return losses, epoch_latent_statistics
-
-
-if __name__ == "__main__":
-    import pathlib
-    from utils.ImageLoader import FlattenedImageFolder
-
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
-
-    BATCH_SIZE = 8
-    RANDOM_SEED = 423
-
-    path = pathlib.Path("flattened_dataset")
-    dataset = FlattenedImageFolder(path, transform=vae_preprocess_transforms)
-
-    train_data, val_data, test_data = data.random_split(
-        dataset, lengths=[0.8, 0.1, 0.1], generator=torch.manual_seed(RANDOM_SEED)
-    )
-    train_loader = data.DataLoader(
-        train_data,
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-        generator=torch.manual_seed(RANDOM_SEED),
-    )
-    val_loader = data.DataLoader(val_data, batch_size=BATCH_SIZE)
-
-    model = VAE(input_channels=3, hidden_dimensions=32, latent_dimensions=8).to(device)
-    criterion = VAELoss(beta=1).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    early_stop = EarlyStop(patience=10, min_delta=100, checkpoint_path="best_vae.ckpt")
-
-    losses = training_loop(
-        model,
-        criterion,
-        optimizer,
-        train_loader,
-        val_loader,
-        num_epochs=50,
-        early_stop=early_stop,
-        device=device,
-    )
