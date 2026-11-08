@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pathlib
 import os
 import logging
 from datetime import datetime
@@ -32,19 +31,20 @@ def displayOriginal(image, mean=0.5, std=0.5):
 
 
 def calc_scaling_factor(
-    VAE: VAE,
+    vae: VAE,
     dataset: torch.utils.data.DataLoader,
     device: Literal["cpu", "cuda", "mps"] = "cpu",
 ):
     latent_sum = latent_square_sum = latent_count = 0
-
-    VAE.eval()
+    vae.to(device)
+    vae.eval()
     with torch.inference_mode():
         for batch in dataset:
             batch = batch.to(device)
 
-            mu, logvar = VAE.encode(batch)
-            z = VAE.reparameterize(mu, logvar)
+            mu, logvar = vae.encode(batch)
+            z = vae.reparameterize(mu, logvar)
+            z = z.to(torch.float64)
 
             latent_sum += z.sum().item()
             latent_square_sum += z.square().sum().item()
@@ -52,82 +52,11 @@ def calc_scaling_factor(
 
     latent_mean = latent_sum / latent_count
     latent_variance = (latent_square_sum / latent_count) - latent_mean**2
+    latent_variance = max(latent_variance, 0)
 
     latent_std = latent_variance**0.5
 
     return 1 / latent_std
-
-
-class EarlyStop:
-    def __init__(
-        self,
-        patience: int = 10,
-        min_delta: float = 10,
-        checkpoint_path: str | os.PathLike = "best_model.ckpt",
-    ):
-        if patience < 1:
-            raise ValueError("patience must be >= 1")
-
-        if min_delta < 0:
-            raise ValueError("min_delta must be >= 0")
-
-        self.patience = patience
-        self.min_delta = min_delta
-        self.checkpoint_path = pathlib.Path(checkpoint_path)
-
-        self.best_metric = float("inf")
-
-        self.best_epoch = 0
-        self.counter = 0
-        self.early_stop = False
-
-    def _is_improvement(self, metric: float) -> bool:
-        return metric < self.best_metric - self.min_delta
-
-    def __call__(
-        self,
-        metric: float,
-        model: torch.nn.Module,
-        epoch: int,
-        optimizer=None,
-    ) -> bool:
-        # Avoid NaN or infinite metrics
-        if not torch.isfinite(torch.tensor(metric)):
-            raise ValueError(f"Invalid metric: {metric}")
-
-        # If improvement then reset early stop counter
-        if self._is_improvement(metric):
-            self.best_metric = metric
-            self.best_epoch = epoch
-            self.counter = 0
-
-            checkpoint = {
-                "epoch": epoch,
-                "metric": metric,
-                "model_state_dict": model.state_dict(),
-            }
-
-            if optimizer is not None:
-                checkpoint["optimizer_state_dict"] = optimizer.state_dict()
-
-            torch.save(checkpoint, self.checkpoint_path)
-
-        else:
-            self.counter += 1
-
-        if self.counter >= self.patience:
-            self.early_stop = True
-
-        return self.early_stop
-
-    def status(self):
-        return {
-            "best_metric": self.best_metric,
-            "best_epoch": self.best_epoch,
-            "counter": self.counter,
-            "patience": self.patience,
-            "early_stop": self.early_stop,
-        }
 
 
 def kl_per_channel(mus: torch.Tensor, logvars: torch.Tensor):
@@ -142,13 +71,19 @@ def kl_per_channel(mus: torch.Tensor, logvars: torch.Tensor):
 
 
 def setup_logger(
-    NUM_HIDDEN_DIM: int, NUM_LATENT_DIM: int, LR: float, LOSS_BETA: int
+    NUM_HIDDEN_DIM: int,
+    NUM_LATENT_DIM: int,
+    LR: float,
+    LOSS_BETA: int,
+    filename: str | None = None,
 ) -> logging.Logger:
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     os.makedirs("logs", exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
 
-    logs_filename = f"logs/{timestamp}_hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}.log"
+    if filename is None:
+        filename = f"hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}"
+    logs_filename = f"logs/{timestamp}_{filename}.log"
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",

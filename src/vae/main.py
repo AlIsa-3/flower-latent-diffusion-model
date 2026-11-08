@@ -4,7 +4,7 @@ import torch
 import torch.utils.data as data
 import torch.optim as optim
 
-from vae.vae_utils import EarlyStop, vae_preprocess_transforms, setup_logger
+from vae.vae_utils import vae_preprocess_transforms, setup_logger
 from utils.ImageLoader import FlattenedImageFolder
 from utils import utils
 from vae.vae_architecture import VAE
@@ -65,7 +65,7 @@ def main():
     criterion = VAELoss(beta=LOSS_BETA).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
-    early_stop = EarlyStop(
+    early_stop = utils.EarlyStop(
         patience=EARLY_STOP_PATIENCE,
         min_delta=EARLY_STOP_MIN_DELTA,
         checkpoint_path=CHECKPOINT_PATH,

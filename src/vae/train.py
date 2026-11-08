@@ -7,8 +7,9 @@ from collections import defaultdict
 
 from vae.vae_architecture import VAE
 from vae.VAELoss import VAELoss
-from vae.vae_utils import EarlyStop, kl_per_channel
+from vae.vae_utils import kl_per_channel
 from utils.logger import get_null_logger
+from utils.utils import EarlyStop
 
 from typing import Literal
 
