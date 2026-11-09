@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from sampling.sampler_utils import calc_sigmas
 
 
 class CosineNoiseScheduler(nn.Module):
@@ -8,6 +9,7 @@ class CosineNoiseScheduler(nn.Module):
     alpha_bars: torch.Tensor
     alphas: torch.Tensor
     betas: torch.Tensor
+    sigmas: torch.Tensor
 
     def __init__(self, num_timesteps: int, s: float = 0.008) -> None:
         super().__init__()
@@ -56,6 +58,9 @@ class CosineNoiseScheduler(nn.Module):
         noisy_latents = self._forward_diffusion(latents, alpha_bar, noise)
 
         return noisy_latents
+
+    def get_sigmas(self):
+        self.register_buffer("sigmas", calc_sigmas(self.alpha_bars))
 
 
 class SinusoidalTimestepEmbedding(nn.Module):
