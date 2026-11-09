@@ -2,7 +2,7 @@ import torch
 from sampling.sampler_utils import get_ancestral_step
 
 
-def euler_ancestral_sampler(
+def euler_ancestral_update(
     latent: torch.Tensor,
     derivative: torch.Tensor,
     sigma: torch.Tensor,

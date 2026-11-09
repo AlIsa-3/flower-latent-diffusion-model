@@ -1,11 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import random
 import pathlib
 from typing import Literal
 
 
 from vae.vae_utils import unNormalize
+
+from sampling.samplers import euler_ancestral_update
+from sampling.sampler_utils import sampling_loop
 
 
 def visualize_vae(
@@ -54,3 +58,44 @@ def visualize_vae_generations(
                 ax[row, column].axis("off")
     fig.savefig(f"{figure_filename}.{ext}")
     plt.close(fig)
+
+
+def visualize_unet_generations(
+    unet,
+    vae,
+    scheduler,
+    image_path: str,
+    sampling_steps: int = 25,
+    grid_size: int = 20,
+    ext: str = "jpg",
+    device: Literal["cuda", "mps", "cpu"] = "cpu",
+    figsize: tuple[int, int] = (30, 30),
+):
+    pathlib.Path(image_path).parent.mkdir(parents=True, exist_ok=True)
+
+    vae = vae.to(device)
+    unet = unet.to(device)
+    fig, ax = plt.subplots(
+        nrows=grid_size, ncols=grid_size, figsize=figsize, layout="constrained"
+    )
+    with torch.inference_mode():
+        for row in range(grid_size):
+            for column in range(grid_size):
+                timesteps = torch.tensor(
+                    sorted(random.sample(range(1000), k=sampling_steps), reverse=True)
+                )
+                sigmas = scheduler.sigmas[timesteps]
+                sigmas = torch.cat([sigmas, torch.zeros(1)])
+                latent = torch.randn((8, 32, 32)).unsqueeze(0)
+                denoised_latent = sampling_loop(
+                    unet, sigmas, timesteps, latent, euler_ancestral_update, device
+                )
+                decoded = vae.decode(denoised_latent)
+                ax[row, column].imshow(
+                    unNormalize(
+                        np.transpose(decoded.cpu().squeeze(0), (1, 2, 0)), 0.5, 0.5
+                    )
+                )
+                ax[row, column].axis("off")
+    fig.savefig(f"{image_path}.{ext}")
+    plt.close()
