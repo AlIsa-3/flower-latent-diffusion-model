@@ -54,7 +54,7 @@ class UNet(nn.Module):
             raise ValueError("hidden_dimensions must be divisible by 8")
 
         if latent_scaling_factor is None:
-            latent_scaling_factor = torch.tensor(1)
+            latent_scaling_factor = torch.tensor(1.0, dtype=torch.float32)
         self.register_buffer("latent_scaling_factor", latent_scaling_factor)
 
         # Allow model to learn a more useful representation of the timestep embedding

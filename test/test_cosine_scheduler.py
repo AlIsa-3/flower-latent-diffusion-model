@@ -67,3 +67,12 @@ def test_forward_diffusion_alpha_bar_1():
     assert (
         noised_latent == latent
     ).all(), f"With alpha_bar 1, the noised latent should equal the original latent"
+
+
+def test_forward_diffusion():
+    latent = torch.ones((1, 4, 32, 32))
+    noise = torch.ones_like(latent)
+    alpha_bar = torch.tensor(0.25)
+    noised_latent = scheduler._forward_diffusion(latent, alpha_bar, noise)
+    expected = torch.full_like(latent, 1.3660254)
+    assert torch.allclose(noised_latent, expected, atol=1e-6)

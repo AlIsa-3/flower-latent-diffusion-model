@@ -36,16 +36,18 @@ class CosineNoiseScheduler(nn.Module):
 
         # Recalculate alpha_bars based on the new alphas
         alpha_bars = torch.cumprod(alphas, dim=0)
+        sigmas = calc_sigmas(alpha_bars)
 
         # Register so saved with model
         self.register_buffer("alpha_bars", alpha_bars)
+        self.register_buffer("sigmas", sigmas)
         self.register_buffer("betas", betas)
         self.register_buffer("alphas", alphas)
 
     def _forward_diffusion(
         self, z_0: torch.Tensor, alpha_bar: torch.Tensor, eps: torch.Tensor
     ) -> torch.Tensor:
-        return ((alpha_bar**0.5) * z_0) + (eps * ((1 - alpha_bar) ** 2))
+        return (torch.sqrt(alpha_bar) * z_0) + (torch.sqrt(1 - alpha_bar) * eps)
 
     def add_noise(
         self, latents: torch.Tensor, noise: torch.Tensor, timesteps: torch.Tensor
@@ -58,9 +60,6 @@ class CosineNoiseScheduler(nn.Module):
         noisy_latents = self._forward_diffusion(latents, alpha_bar, noise)
 
         return noisy_latents
-
-    def get_sigmas(self):
-        self.register_buffer("sigmas", calc_sigmas(self.alpha_bars))
 
 
 class SinusoidalTimestepEmbedding(nn.Module):
