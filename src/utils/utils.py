@@ -23,6 +23,7 @@ class EarlyStop:
         patience: int = 10,
         min_delta: float = 10,
         checkpoint_path: str | os.PathLike = "best_model.ckpt",
+        latest_checkpoint_path: str | os.PathLike = "latest_model.ckpt",
     ):
         if patience < 1:
             raise ValueError("patience must be >= 1")
@@ -32,12 +33,15 @@ class EarlyStop:
 
         self.patience = patience
         self.min_delta = min_delta
+
         self.checkpoint_path = pathlib.Path(checkpoint_path)
+        self.latest_checkpoint_path = pathlib.Path(latest_checkpoint_path)
+
         # Create parent directories if they don't exist
         self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        self.latest_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
         self.best_metric = float("inf")
-
         self.best_epoch = 0
         self.counter = 0
         self.early_stop = False
@@ -56,20 +60,23 @@ class EarlyStop:
         if not torch.isfinite(torch.tensor(metric)):
             raise ValueError(f"Invalid metric: {metric}")
 
-        # If improvement then reset early stop counter
+        checkpoint = {
+            "epoch": epoch,
+            "metric": metric,
+            "model_state_dict": model.state_dict(),
+        }
+
+        if optimizer is not None:
+            checkpoint["optimizer_state_dict"] = optimizer.state_dict()
+
+        # Always save the latest checkpoint
+        torch.save(checkpoint, self.latest_checkpoint_path)
+
+        # Save the best checkpoint only when the metric improves
         if self._is_improvement(metric):
             self.best_metric = metric
             self.best_epoch = epoch
             self.counter = 0
-
-            checkpoint = {
-                "epoch": epoch,
-                "metric": metric,
-                "model_state_dict": model.state_dict(),
-            }
-
-            if optimizer is not None:
-                checkpoint["optimizer_state_dict"] = optimizer.state_dict()
 
             torch.save(checkpoint, self.checkpoint_path)
 

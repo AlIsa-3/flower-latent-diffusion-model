@@ -59,7 +59,9 @@ def main():
     # Instantiate U-Net
     UNET_HIDDEN_DIMS = 16
     UNET_TIMESTEP_EMBEDDING_DIMS = 256
-    LATENT_SCALING_FACTOR = torch.tensor(calc_scaling_factor(vae, train_loader, device=device))
+    LATENT_SCALING_FACTOR = torch.tensor(
+        calc_scaling_factor(vae, train_loader, device=device)
+    )
 
     unet = UNet(
         input_latent_channels=VAE_LATENT_DIMS,
