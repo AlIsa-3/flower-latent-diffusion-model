@@ -37,7 +37,8 @@ def main():
     LOSS_BETA = 1
 
     # Early Stop Params
-    CHECKPOINT_PATH = pathlib.Path("checkpoints/best_vae.ckpt")
+    CHECKPOINT_PATH = pathlib.Path("models/vae/best_vae.ckpt")
+    LATEST_CHECKPOINT_PATH = pathlib.Path("models/vae/latest_vae.ckpt")
     EARLY_STOP_PATIENCE = 10
     EARLY_STOP_MIN_DELTA = 100
 
@@ -71,6 +72,7 @@ def main():
         patience=EARLY_STOP_PATIENCE,
         min_delta=EARLY_STOP_MIN_DELTA,
         checkpoint_path=CHECKPOINT_PATH,
+        latest_checkpoint_path=LATEST_CHECKPOINT_PATH,
     )
 
     losses = training_loop(

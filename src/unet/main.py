@@ -78,7 +78,12 @@ def main():
     criterion = nn.MSELoss().to(device)
     optimizer = optim.AdamW(unet.parameters(), lr=LR)
 
-    early_stop = utils.EarlyStop(patience=15, min_delta=0.001)
+    early_stop = utils.EarlyStop(
+        patience=15,
+        min_delta=0.001,
+        checkpoint_path="models/unet/best_unet.ckpt",
+        latest_checkpoint_path="models/unet/latest_unet.ckpt",
+    )
 
     logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}"
     logger = setup_logger(filename=logs_filename)
