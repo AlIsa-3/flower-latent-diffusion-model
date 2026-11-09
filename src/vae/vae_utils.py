@@ -41,7 +41,7 @@ def calc_scaling_factor(
 
             mu, logvar = vae.encode(batch)
             z = vae.reparameterize(mu, logvar)
-            z = z.to(torch.float64)
+            z = z.to(torch.float32)
 
             latent_sum += z.sum().item()
             latent_square_sum += z.square().sum().item()

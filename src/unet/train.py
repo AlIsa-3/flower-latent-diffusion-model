@@ -222,6 +222,8 @@ def training_loop(
     )
     epoch_training_losses = []
     epoch_val_losses = []
+    logger.info(f"Beginning Training with {num_epochs} epochs")
+    logger.info(f"Early Stopping Initialized: min_delta {early_stop.min_delta} | patience {early_stop.patience}")
     for epoch in range(num_epochs):
         if device == "mps":
             torch.mps.synchronize()
