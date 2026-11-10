@@ -1,19 +1,24 @@
 from vae.vae_architecture import VAE
 import torch
+import pytest
 
 BOTTLENECK_SIZE = 32
 
 input_channels = 3
 hidden_dimensions = 16
 LATENT_DIMENSIONS = 4
-model = VAE(
-    input_channels=input_channels,
-    hidden_dimensions=hidden_dimensions,
-    latent_dimensions=LATENT_DIMENSIONS,
-)
 
 
-def test_vae_reconstruction_dimensions():
+@pytest.fixture()
+def model():
+    return VAE(
+        input_channels=input_channels,
+        hidden_dimensions=hidden_dimensions,
+        latent_dimensions=LATENT_DIMENSIONS,
+    )
+
+
+def test_vae_reconstruction_dimensions(model):
     model_input = torch.randn(1, 3, 256, 256)
 
     # Get model output
@@ -33,7 +38,7 @@ def test_vae_reconstruction_dimensions():
     ), f"Mu shape is not (1,4,16,16), got {mu.shape}"
 
 
-def test_vae_mu_dimensions():
+def test_vae_mu_dimensions(model):
     model_input = torch.randn(1, 3, 256, 256)
 
     # Get model output
@@ -46,7 +51,7 @@ def test_vae_mu_dimensions():
     ), f"Mu shape is not (1,4,16,16), got {mu.shape}"
 
 
-def test_vae_logvar_dimensions():
+def test_vae_logvar_dimensions(model):
     model_input = torch.randn(1, 3, 256, 256)
 
     # Get model output
@@ -62,7 +67,7 @@ def test_vae_logvar_dimensions():
     ), f"logvar shape is not (1,{LATENT_DIMENSIONS},{BOTTLENECK_SIZE},{BOTTLENECK_SIZE}), got {logvar.shape}"
 
 
-def test_vae_mu_logvar_dimensions_equal():
+def test_vae_mu_logvar_dimensions_equal(model):
     model_input = torch.randn(1, 3, 256, 256)
 
     # Get model output

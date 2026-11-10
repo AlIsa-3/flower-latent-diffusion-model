@@ -65,3 +65,22 @@ def test_calc_velocity_invalid_timestep(scheduler):
 
     with pytest.raises(IndexError):
         calc_velocity(latents, noise, timesteps, scheduler)
+
+
+def test_velocity_recovers_clean_latents(scheduler):
+    latents = torch.randn(4, 8, 32, 32)
+    noise = torch.randn_like(latents)
+    timesteps = torch.tensor([10, 100, 500, 900])
+
+    noised_latents = scheduler.add_noise(latents, noise, timesteps)
+
+    velocity = calc_velocity(latents, noise, timesteps, scheduler)
+
+    alpha_bar = scheduler.alpha_bars[timesteps]
+    alpha_bar = alpha_bar.reshape(-1, 1, 1, 1)
+
+    recovered_latents = (
+        torch.sqrt(alpha_bar) * noised_latents - torch.sqrt(1 - alpha_bar) * velocity
+    )
+
+    assert torch.allclose(recovered_latents, latents, rtol=1e-4, atol=1e-5)
