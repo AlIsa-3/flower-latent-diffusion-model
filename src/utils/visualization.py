@@ -65,6 +65,7 @@ def visualize_unet_generations(
     vae,
     scheduler,
     image_path: str,
+    prediction_type: Literal["eps", "v"],
     sampling_steps: int = 25,
     grid_size: int = 20,
     ext: str = "jpg",
@@ -88,7 +89,13 @@ def visualize_unet_generations(
                 sigmas = torch.cat([sigmas, torch.zeros(1)])
                 latent = torch.randn((8, 32, 32)).unsqueeze(0)
                 denoised_latent = sampling_loop(
-                    unet, sigmas, timesteps, latent, euler_ancestral_update, device
+                    unet,
+                    sigmas,
+                    timesteps,
+                    latent,
+                    euler_ancestral_update,
+                    device,
+                    prediction_type,
                 )
                 decoded = vae.decode(denoised_latent)
                 ax[row, column].imshow(

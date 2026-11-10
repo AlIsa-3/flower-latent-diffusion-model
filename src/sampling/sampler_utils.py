@@ -20,7 +20,7 @@ def calc_sigmas(alpha_bars: torch.Tensor) -> torch.Tensor:
     return torch.sqrt(((1 - alpha_bars) / alpha_bars))
 
 
-def estimate_clean_vp_latent(
+def estimate_clean_vp_latent_from_eps(
     latent: torch.Tensor, eps: torch.Tensor, alpha_bar: torch.Tensor
 ) -> torch.Tensor:
     return (latent - (torch.sqrt(1 - alpha_bar) * eps)) / torch.sqrt(alpha_bar)
@@ -54,6 +54,7 @@ def convert_from_sigmas(x_sigma: torch.Tensor, sigma: torch.Tensor):
     return x_sigma / torch.sqrt(1 + sigma**2)
 
 
+@torch.inference_mode()
 def sampling_loop(
     unet: UNet,
     sigmas: torch.Tensor,
@@ -61,26 +62,47 @@ def sampling_loop(
     latent: torch.Tensor,
     sampler: Callable,
     device: Literal["cuda", "mps", "cpu"],
+    prediction_type: Literal["eps", "v"],
 ):
-    with torch.inference_mode():
-        unet = unet.to(device)
-        unet.eval()
-        sigmas = sigmas.to(device)
-        timesteps = timesteps.to(device)
-        # Scale latent (assuming sigmas are in descending order):
-        latent = latent.to(device) * sigmas[0]
+    if prediction_type not in ("eps", "v"):
+        raise ValueError("prediction_type must be 'eps' or 'v'")
 
-        for idx, timestep in enumerate(timesteps):
-            timestep = timestep.expand(latent.shape[0])
-            sigma = sigmas[idx]
-            sigma_next = sigmas[idx + 1]
+    if sigmas.ndim != 1 or timesteps.ndim != 1:
+        raise ValueError("sigmas and timesteps must be 1D")
 
-            vp_latent = convert_from_sigmas(latent, sigma)
-            eps = unet(vp_latent, timestep)
+    if sigmas.numel() != timesteps.numel() + 1:
+        raise ValueError("sigmas must contain exactly one more element than timesteps")
 
-            denoised_latent = calc_denoised_latent(latent, sigma, eps)
-            derivative = to_derivative(latent, denoised_latent, sigma)
+    unet = unet.to(device)
+    unet.eval()
 
-            latent = sampler(latent, derivative, sigma, sigma_next)
+    sigmas = sigmas.to(device)
+    timesteps = timesteps.to(device)
+    latent = latent.to(device) * sigmas[0]
+
+    for idx, timestep in enumerate(timesteps):
+        timestep = timestep.expand(latent.shape[0])
+
+        sigma = sigmas[idx]
+        sigma_next = sigmas[idx + 1]
+
+        vp_latent = convert_from_sigmas(latent, sigma)
+
+        prediction = unet(vp_latent, timestep)
+
+        if prediction_type == "eps":
+            denoised_latent = calc_denoised_latent(latent, sigma, prediction)
+
+        elif prediction_type == "v":
+            alpha_bar = 1 / (1 + sigma.square())
+
+            denoised_latent = (
+                torch.sqrt(alpha_bar) * vp_latent
+                - torch.sqrt(1 - alpha_bar) * prediction
+            )
+
+        derivative = to_derivative(latent, denoised_latent, sigma)
+
+        latent = sampler(latent, derivative, sigma, sigma_next)
 
     return latent / unet.latent_scaling_factor
