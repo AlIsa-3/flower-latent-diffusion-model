@@ -99,3 +99,12 @@ def visualize_unet_generations(
                 ax[row, column].axis("off")
     fig.savefig(f"{image_path}.{ext}")
     plt.close()
+
+
+def visualize_unet_generation(decoded_image, figsize, file_path, file_ext: str = "jpg"):
+    pathlib.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=figsize, layout="constrained")
+    ax.imshow(
+        unNormalize(np.transpose(decoded_image.cpu().squeeze(0), (1, 2, 0)), 0.5, 0.5)
+    )
+    fig.savefig(f"{file_path}.{file_ext}")
