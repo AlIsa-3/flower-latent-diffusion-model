@@ -63,6 +63,11 @@ def main():
         calc_scaling_factor(vae, train_loader, device=device)
     )
 
+    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}"
+    logger = setup_logger(filename=logs_filename)
+    logger.info(f"VAE Checkpoint: {vae_path}")
+    logger.info(f"Latent Scaling Factor: {LATENT_SCALING_FACTOR:.5f}")
+
     unet = UNet(
         input_latent_channels=VAE_LATENT_DIMS,
         hidden_dimensions=UNET_HIDDEN_DIMS,
@@ -84,9 +89,6 @@ def main():
         checkpoint_path="models/unet/best_unet.ckpt",
         latest_checkpoint_path="models/unet/latest_unet.ckpt",
     )
-
-    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}"
-    logger = setup_logger(filename=logs_filename)
 
     training_loop(
         unet,

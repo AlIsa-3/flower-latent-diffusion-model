@@ -259,6 +259,8 @@ def training_loop(
 
         if should_stop:
             logger.info("Early stopping triggered.")
+            logger.info(f"Saving best model to {early_stop.checkpoint_path}")
+            logger.info(f"Saving latest model to {early_stop.latest_checkpoint_path}")
             break
 
     return epoch_training_losses, epoch_val_losses
