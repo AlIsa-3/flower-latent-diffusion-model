@@ -111,7 +111,13 @@ def visualize_unet_generations(
 def visualize_unet_generation(decoded_image, figsize, file_path, file_ext: str = "jpg"):
     pathlib.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=figsize, layout="constrained")
-    ax.imshow(
-        unNormalize(np.transpose(decoded_image.cpu().squeeze(0), (1, 2, 0)), 0.5, 0.5)
-    )
+    ax.imshow(unet_generation_to_numpy(decoded_image))
     fig.savefig(f"{file_path}.{file_ext}")
+
+
+def unet_generation_to_numpy(decoded_image):
+    return unNormalize(
+        np.transpose(decoded_image.detach().cpu().squeeze(0).numpy(), (1, 2, 0)),
+        0.5,
+        0.5,
+    )
