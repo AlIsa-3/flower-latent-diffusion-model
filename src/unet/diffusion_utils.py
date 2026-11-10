@@ -84,3 +84,15 @@ class SinusoidalTimestepEmbedding(nn.Module):
 
         embeddings = torch.cat([torch.sin(angles), torch.cos(angles)], dim=1)
         return embeddings
+
+
+def calc_velocity(
+    latents: torch.Tensor,
+    noise: torch.Tensor,
+    timesteps: torch.Tensor,
+    scheduler: CosineNoiseScheduler,
+) -> torch.Tensor:
+    alpha_bar = scheduler.alpha_bars[timesteps]
+    alpha_bar = alpha_bar.reshape(-1, 1, 1, 1)
+
+    return torch.sqrt(alpha_bar) * noise - torch.sqrt(1 - alpha_bar) * latents

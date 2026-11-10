@@ -12,7 +12,7 @@ from utils.logger import get_null_logger
 from vae.vae_architecture import VAE
 
 from unet.unet_architecture import UNet
-from unet.diffusion_utils import CosineNoiseScheduler
+from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity
 
 type TrainingLosses = tuple[list[float], list[float]]
 
@@ -85,11 +85,18 @@ def train(
     optimizer: optim.Optimizer,
     train_loader: data.DataLoader,
     device: Literal["cuda", "mps", "cpu"],
+    prediction_type: Literal["eps", "v"],
 ) -> dict[str, float]:
     if len(train_loader) == 0:
         raise ValueError("Empty dataloader received")
 
+    if prediction_type not in ["eps", "v"]:
+        raise ValueError(
+            f"Unsupported prediction type, supported = (eps,v), received = {prediction_type}"
+        )
+
     unet.train()
+    vae.eval()
 
     training_loss = 0
     grad_norms = []
@@ -99,9 +106,9 @@ def train(
     predictions_square_sum = 0
     prediction_count = 0
 
-    noise_sum = 0
-    noise_square_sum = 0
-    noise_count = 0
+    target_sum = 0
+    target_square_sum = 0
+    target_count = 0
 
     for batch in train_loader:
         batch = batch.to(device)
@@ -118,8 +125,14 @@ def train(
 
         predictions = unet(noised_latents, time_steps)
 
-        # compare to actual noise added
-        loss = criterion(predictions, noise)
+        # Determine the training target
+        # If epsilon prediction:
+        if prediction_type == "eps":
+            target = noise
+        # If v prediction:
+        elif prediction_type == "v":
+            target = calc_velocity(latents, noise, time_steps, scheduler)
+        loss = criterion(predictions, target)
         loss.backward()
         training_loss += loss.item() * batch_size
         num_samples += batch_size
@@ -130,10 +143,10 @@ def train(
         predictions_square_sum += predictions.square().sum().item()
         prediction_count += predictions.numel()
 
-        noise = noise.detach().float()
-        noise_sum += noise.sum().item()
-        noise_square_sum += noise.square().sum().item()
-        noise_count += noise.numel()
+        target = target.detach().float()
+        target_sum += target.sum().item()
+        target_square_sum += target.square().sum().item()
+        target_count += target.numel()
 
         # clip gradient norm to prevent instability
         grad_norm = nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
@@ -146,7 +159,13 @@ def train(
     avg_grad_norm = sum(grad_norms) / len(grad_norms)
     max_grad_norm = max(grad_norms)
     prediction_mean = predictions_sum / prediction_count
-    noise_mean = noise_sum / noise_count
+    target_mean = target_sum / target_count
+
+    prediction_std = (
+        max((predictions_square_sum / prediction_count) - prediction_mean**2, 0) ** 0.5
+    )
+
+    target_std = max((target_square_sum / target_count) - target_mean**2, 0) ** 0.5
     clipped_batches = sum(norm > 1.0 for norm in grad_norms)
     clipping_percentage = 100 * clipped_batches / len(grad_norms)
     return {
@@ -154,12 +173,9 @@ def train(
         "average_pre_clip_grad_norm": avg_grad_norm,
         "max_pre_clip_grad_norm": max_grad_norm,
         "prediction_mean": prediction_mean,
-        "prediction_std": max(
-            ((predictions_square_sum / prediction_count) - prediction_mean**2), 0
-        )
-        ** 0.5,
-        "noise_mean": noise_mean,
-        "noise_std": max(((noise_square_sum / noise_count) - noise_mean**2), 0) ** 0.5,
+        "prediction_std": prediction_std,
+        "target_mean": target_mean,
+        "target_std": target_std,
         "clipping_percentage": clipping_percentage,
     }
 
@@ -170,7 +186,12 @@ def validate(
     criterion: nn.Module,
     val_loader: data.DataLoader,
     device: Literal["cuda", "mps", "cpu"],
+    prediction_type: Literal["eps", "v"],
 ) -> float:
+    if prediction_type not in ["eps", "v"]:
+        raise ValueError(
+            f"Unsupported prediction type, supported = (eps,v), received = {prediction_type}"
+        )
     val_loss = 0
     num_samples = 0
 
@@ -186,7 +207,13 @@ def validate(
             noised_latents = scheduler.add_noise(latents, noises, timesteps)
 
             predictions = unet(noised_latents, timesteps)
-            loss = criterion(predictions, noises)
+
+            if prediction_type == "eps":
+                target = noises
+            elif prediction_type == "v":
+                target = calc_velocity(latents, noises, timesteps, scheduler)
+
+            loss = criterion(predictions, target)
             val_loss += loss.item() * current_batch_size
             num_samples += current_batch_size
 
@@ -205,6 +232,7 @@ def training_loop(
     train_loader: data.DataLoader,
     val_loader: data.DataLoader,
     num_epochs: int,
+    prediction_type: Literal["eps", "v"],
     early_stop: utils.EarlyStop | None = None,
     device: Literal["cuda", "mps", "cpu"] = "cpu",
     logger: logging.Logger | None = None,
@@ -217,6 +245,10 @@ def training_loop(
     if early_stop is None:
         early_stop = utils.EarlyStop()
 
+    if prediction_type not in ("eps", "v"):
+        raise ValueError(
+            f"Unsupported prediction type, supported = (eps,v), received = {prediction_type}"
+        )
     val_loader = prepare_validation_data(
         vae, unet.latent_scaling_factor, scheduler, val_loader, device
     )
@@ -231,10 +263,19 @@ def training_loop(
             torch.mps.synchronize()
         epoch_start = time.perf_counter()
         train_statistics = train(
-            unet, vae, scheduler, criterion, optimizer, train_loader, device
+            unet,
+            vae,
+            scheduler,
+            criterion,
+            optimizer,
+            train_loader,
+            device,
+            prediction_type,
         )
 
-        val_loss = validate(unet, scheduler, criterion, val_loader, device)
+        val_loss = validate(
+            unet, scheduler, criterion, val_loader, device, prediction_type
+        )
 
         epoch_training_losses.append(train_statistics["loss"])
         epoch_val_losses.append(val_loss)

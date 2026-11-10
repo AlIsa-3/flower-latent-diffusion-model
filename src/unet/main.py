@@ -12,9 +12,13 @@ from utils.ImageLoader import FlattenedImageFolder
 from unet.unet_architecture import UNet
 from unet.diffusion_utils import CosineNoiseScheduler
 from unet.train import training_loop
+from typing import Literal
 
 
 def main():
+    # Choose prediction type (eps vs v)
+    PREDICTION_TARGET: Literal["eps", "v"] = "eps"
+
     SEED = 235
     torch.manual_seed(SEED)
     NUM_EPOCHS = 500
@@ -63,8 +67,12 @@ def main():
         calc_scaling_factor(vae, train_loader, device=device)
     )
 
-    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}"
+    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}"
     logger = setup_logger(filename=logs_filename)
+    if PREDICTION_TARGET == "eps":
+        logger.info("Running training with epsilon prediction")
+    elif PREDICTION_TARGET == "v":
+        logger.info("Running training with v prediction")
     logger.info(f"VAE Checkpoint: {vae_path}")
     logger.info(f"Latent Scaling Factor: {LATENT_SCALING_FACTOR:.5f}")
 
@@ -86,8 +94,8 @@ def main():
     early_stop = utils.EarlyStop(
         patience=15,
         min_delta=0.001,
-        checkpoint_path="models/unet/best_unet.ckpt",
-        latest_checkpoint_path="models/unet/latest_unet.ckpt",
+        checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}.ckpt",
+        latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}.ckpt",
     )
 
     training_loop(
@@ -102,6 +110,7 @@ def main():
         early_stop=early_stop,
         device=device,
         logger=logger,
+        prediction_type=PREDICTION_TARGET,
     )
 
 
