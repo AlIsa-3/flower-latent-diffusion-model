@@ -1,5 +1,6 @@
 import pathlib
 import logging
+import time
 import torch
 import torch.utils.data as data
 import torch.nn as nn
@@ -16,14 +17,15 @@ from typing import Literal
 
 
 def main():
+    setup_start = time.perf_counter()
     # Choose prediction type (eps vs v)
-    PREDICTION_TARGET: Literal["eps", "v"] = "eps"
+    PREDICTION_TARGET: Literal["eps", "v"] = "v"
 
     SEED = 235
     torch.manual_seed(SEED)
-    NUM_EPOCHS = 500
+    NUM_EPOCHS = 2000
     BATCH_SIZE = 8
-    LR = 0.0001
+    LR = 1e-4
 
     VAE_INPUT_CHANNELS = 3
     VAE_HIDDEN_DIMS = 32
@@ -67,13 +69,25 @@ def main():
         calc_scaling_factor(vae, train_loader, device=device)
     )
 
-    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}"
+    logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}_prediction"
     logger = setup_logger(filename=logs_filename)
     if PREDICTION_TARGET == "eps":
         logger.info("Running training with epsilon prediction")
     elif PREDICTION_TARGET == "v":
         logger.info("Running training with v prediction")
+    setup_finish = time.perf_counter()
+    logger.info(f"Setup Time Taken: {setup_finish-setup_start:.5f}s")
+    logger.info(
+        f"Training Set Size: {len(train_set)} | Validation Set Size: {len(val_set)} | Batch Size {BATCH_SIZE}"
+    )
+    logger.info(
+        f"U-Net info: Latent Input Dimensions = {VAE_LATENT_DIMS} | Initial Hidden Dimensions = {UNET_HIDDEN_DIMS} | Time-Step Embedding Dimensions = {UNET_TIMESTEP_EMBEDDING_DIMS}"
+    )
+    logger.info(f"Learning rate: {LR}")
     logger.info(f"VAE Checkpoint: {vae_path}")
+    logger.info(
+        f"VAE Info: VAE Input Channels = {VAE_INPUT_CHANNELS} | VAE Initial Hidden Dimensions = {VAE_HIDDEN_DIMS} | VAE Encoder Output Latent Channels = {VAE_LATENT_DIMS}"
+    )
     logger.info(f"Latent Scaling Factor: {LATENT_SCALING_FACTOR:.5f}")
 
     unet = UNet(
@@ -85,14 +99,18 @@ def main():
 
     # Instantiate Noise Scheduler
     NUM_TIMESTEPS = 1000
-    scheduler = CosineNoiseScheduler(num_timesteps=NUM_TIMESTEPS, s=0.008).to(device)
+    scheduler = CosineNoiseScheduler(
+        num_timesteps=NUM_TIMESTEPS, s=0.008, zero_terminal_snr=True
+    ).to(device)
+    logger.info(
+        f"Noise Scheduler: {scheduler._get_name()} | Num Training Time-Steps: {NUM_TIMESTEPS} | s = {scheduler.s} | ZSNR: {scheduler.zero_terminal_snr}"
+    )
 
     # Instantiate Optimizer and Criterion
     criterion = nn.MSELoss().to(device)
-    optimizer = optim.AdamW(unet.parameters(), lr=LR)
-
+    optimizer = optim.AdamW(unet.parameters(), lr=LR, weight_decay=1e-4)
     early_stop = utils.EarlyStop(
-        patience=15,
+        patience=25,
         min_delta=0.001,
         checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}.ckpt",
         latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}.ckpt",

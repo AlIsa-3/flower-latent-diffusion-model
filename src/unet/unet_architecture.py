@@ -267,7 +267,7 @@ class UNet(nn.Module):
         )
 
         nn.init.zeros_(self.output_conv.weight)
-        nn.init.zeros_(self.output_conv.bias)
+        nn.init.zeros_(self.output_conv.bias) # type: ignore
 
     def forward(self, x: torch.Tensor, timestep: torch.Tensor) -> torch.Tensor:
         height, width = x.shape[-2:]

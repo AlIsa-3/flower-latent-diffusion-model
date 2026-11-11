@@ -12,9 +12,26 @@ from utils.logger import get_null_logger
 from vae.vae_architecture import VAE
 
 from unet.unet_architecture import UNet
-from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity
+from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity, min_snr_weighting
+from inference.inference import Inference
 
 type TrainingLosses = tuple[list[float], list[float]]
+
+
+@torch.inference_mode()
+def inference_while_training(
+    unet, vae, scheduler, device, prediction_type, current_epoch
+):
+    steps = 20
+    seed = 435
+    inference = Inference(unet, vae, scheduler, device, prediction_type)
+    inference.sample(
+        steps,
+        seed,
+        image_name=f"epoch_images/Epoch_{current_epoch}",
+        starting_timestep=scheduler.num_timesteps,
+        debug=True,
+    )
 
 
 @torch.no_grad()
@@ -87,6 +104,7 @@ def train(
     device: Literal["cuda", "mps", "cpu"],
     prediction_type: Literal["eps", "v"],
 ) -> dict[str, float]:
+    NORM_CLIP_THRESHOLD = 1
     if len(train_loader) == 0:
         raise ValueError("Empty dataloader received")
 
@@ -132,7 +150,23 @@ def train(
         # If v prediction:
         elif prediction_type == "v":
             target = calc_velocity(latents, noise, time_steps, scheduler)
+
+        # Calculate per-element loss
         loss = criterion(predictions, target)
+
+        # Average over channels and spatial dimensions
+        per_sample_loss = loss.mean(dim=(1, 2, 3))
+
+        # Calculate Min-SNR weights
+        weights = min_snr_weighting(
+            time_steps,
+            scheduler,
+            gamma=5.0,
+        )
+
+        # Apply weights and average across batch
+
+        loss = (per_sample_loss * weights).mean()
         loss.backward()
         training_loss += loss.item() * batch_size
         num_samples += batch_size
@@ -149,7 +183,9 @@ def train(
         target_count += target.numel()
 
         # clip gradient norm to prevent instability
-        grad_norm = nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
+        grad_norm = nn.utils.clip_grad_norm_(
+            unet.parameters(), max_norm=NORM_CLIP_THRESHOLD
+        )
         grad_norms.append(grad_norm.item())
 
         optimizer.step()
@@ -166,7 +202,7 @@ def train(
     )
 
     target_std = max((target_square_sum / target_count) - target_mean**2, 0) ** 0.5
-    clipped_batches = sum(norm > 1.0 for norm in grad_norms)
+    clipped_batches = sum(norm > NORM_CLIP_THRESHOLD for norm in grad_norms)
     clipping_percentage = 100 * clipped_batches / len(grad_norms)
     return {
         "loss": training_loss,
@@ -289,6 +325,22 @@ def training_loop(
             logger, epoch, train_statistics, val_loss, epoch_finish - epoch_start
         )
 
+        # Test inference and save snapshot of model
+        if epoch % 5 == 0:
+            if device == "mps":
+                torch.mps.synchronize()
+            inference_start = time.perf_counter()
+            inference_while_training(
+                unet, vae, scheduler, device, prediction_type, epoch
+            )
+            if device == "mps":
+                torch.mps.synchronize()
+            inference_end = time.perf_counter()
+            logger.info(f"Inference Duration: {inference_end-inference_start:.5f}")
+            path = f"epoch_images/epoch_{epoch}.pth"
+            torch.save(unet.state_dict(), path)
+            logger.info(f"U-Net snapshot saved to {path}")
+
         should_stop = early_stop(
             metric=val_loss,
             model=unet,
@@ -315,10 +367,10 @@ def log_statistics(
     epoch_time: float,
 ) -> None:
     train_statistics_str = "\n".join(
-        [f"{key} = {value:.4f}" for key, value in train_statistics.items()]
+        [f"{key} = {value:.6f}" for key, value in train_statistics.items()]
     )
     logger.info(
         f"\nEpoch {epoch + 1} | Time Taken: {epoch_time:.3f}s\n\n"
         f"{train_statistics_str}\n"
-        f"Validation Loss: {val_loss:.4f}"
+        f"Validation Loss: {val_loss:.6f}"
     )

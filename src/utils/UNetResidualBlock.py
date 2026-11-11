@@ -12,7 +12,7 @@ class UNetResidualBlock(ResidualBlock):
         )
 
         nn.init.zeros_(self.conv2.weight)
-        nn.init.zeros_(self.conv2.bias)
+        nn.init.zeros_(self.conv2.bias)  # type: ignore
 
     # Add default time_embedding to avoid typing warning
     def forward(

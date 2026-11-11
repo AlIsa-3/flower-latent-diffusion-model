@@ -1,12 +1,11 @@
 from vae.vae_utils import unNormalize
 from sampling.sampler_utils import sampling_loop
 from sampling.samplers import euler_ancestral_update
-
+from utils.visualization import image_to_uint8
+from PIL import Image
 import torch
 import pathlib
 import time
-import matplotlib.pyplot as plt
-import numpy as np
 from typing import Literal
 import random
 
@@ -44,6 +43,8 @@ class Inference:
         image_name: str = "image",
         image_ext: str = "jpg",
         starting_timestep: int = 900,
+        debug: bool = False,
+        save_image: bool = True,
     ) -> torch.Tensor:
         if steps < 1 or steps > self.training_timesteps:
             raise ValueError(f"Steps must be between 1 and {self.training_timesteps}")
@@ -61,9 +62,19 @@ class Inference:
         generator = torch.Generator(device=self.device).manual_seed(seed)
         torch.manual_seed(seed)
         random.seed(seed)
-        timesteps = torch.tensor(
-            sorted(random.sample(range(900), k=25), reverse=True), device=self.device
-        )
+        if debug:
+            timesteps = (
+                torch.linspace(
+                    starting_timestep - 1, 0, steps=steps, device=self.device
+                )
+                .round()
+                .long()
+            )
+        else:
+            timesteps = torch.tensor(
+                sorted(random.sample(range(starting_timestep), k=steps), reverse=True),
+                device=self.device,
+            )
         sigmas = self.scheduler.sigmas[timesteps]
         sigmas = torch.cat([sigmas, sigmas.new_zeros(1)])
         latent = torch.randn(
@@ -80,18 +91,22 @@ class Inference:
             self.prediction_type,
         )
         decoded = self.vae.decode(denoised_latent)
-        self._save_image(decoded, name=image_name, ext=image_ext)
+        if save_image:
+            self._save_image(decoded, name=image_name, ext=image_ext)
         return decoded
 
-    def _save_image(self, image: torch.Tensor, name: str, ext: str = "jpg") -> None:
+    def _save_image(
+        self,
+        image: torch.Tensor,
+        name: str,
+        ext: str = "jpg",
+    ) -> None:
         save_path = pathlib.Path(f"{name}.{ext}")
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        fig, ax = plt.subplots(figsize=(8, 8), layout="constrained")
-        ax.imshow(
-            unNormalize(
-                np.transpose(image.detach().cpu().squeeze(0), (1, 2, 0)), 0.5, 0.5
-            )
-        )
-        ax.axis("off")
-        fig.savefig(str(save_path), bbox_inches="tight")
-        plt.close()
+
+        # Convert tensor to numpy image
+        numpy_image = image_to_uint8(image)
+
+        # Save using Pillow
+        pil_image = Image.fromarray(numpy_image)
+        pil_image.save(save_path)
