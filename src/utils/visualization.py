@@ -121,3 +121,10 @@ def unet_generation_to_numpy(decoded_image):
         0.5,
         0.5,
     )
+
+
+def image_to_uint8(decoded_image):
+    image = unet_generation_to_numpy(decoded_image)
+    image = np.clip(image, 0, 1)
+    image = (image * 255).round().astype(np.uint8)
+    return image

@@ -10,6 +10,13 @@ def scheduler():
     return CosineNoiseScheduler(num_timesteps=NUM_TIMESTEPS, s=0.008)
 
 
+@pytest.fixture
+def zsnr_scheduler():
+    return CosineNoiseScheduler(
+        num_timesteps=NUM_TIMESTEPS, s=0.008, zero_terminal_snr=True
+    )
+
+
 # Check that alpha_bars, alphas, betas all have same shape --> They should be 1D arrays
 
 
@@ -28,7 +35,7 @@ def test_betas_shape(scheduler):
 def test_alpha_bars_shape(scheduler):
     assert (
         scheduler.alpha_bars.shape[0] == 100
-    ), f"Alpha_bars shape not 100, got {scheduler.alphas_bars.shape}"
+    ), f"Alpha_bars shape not 100, got {scheduler.alpha_bars.shape}"
 
 
 def test_betas_final(scheduler):
@@ -82,3 +89,44 @@ def test_forward_diffusion(scheduler):
     noised_latent = scheduler._forward_diffusion(latent, alpha_bar, noise)
     expected = torch.full_like(latent, 1.3660254)
     assert torch.allclose(noised_latent, expected, atol=1e-6)
+
+
+def test_zero_snr_final_alpha_bar(zsnr_scheduler):
+    assert zsnr_scheduler.alpha_bars[-1].item() == 0
+
+
+def test_zero_snr_final_alpha(zsnr_scheduler):
+    assert zsnr_scheduler.alphas[-1].item() == 0
+
+
+def test_zero_snr_final_beta(zsnr_scheduler):
+    assert zsnr_scheduler.betas[-1].item() == 1
+
+
+def test_zero_snr_preserves_initial_alpha_bar(scheduler, zsnr_scheduler):
+    assert torch.allclose(
+        scheduler.alpha_bars[0],
+        zsnr_scheduler.alpha_bars[0],
+    )
+
+
+def test_zero_snr_schedule_is_finite(zsnr_scheduler):
+    assert torch.isfinite(zsnr_scheduler.alpha_bars).all()
+    assert torch.isfinite(zsnr_scheduler.alphas).all()
+    assert torch.isfinite(zsnr_scheduler.betas).all()
+    assert torch.isfinite(zsnr_scheduler.sigmas).all()
+
+
+def test_zero_snr_terminal_add_noise(zsnr_scheduler):
+    latent = torch.randn((2, 4, 32, 32))
+    noise = torch.randn_like(latent)
+
+    timesteps = torch.full(
+        (2,),
+        zsnr_scheduler.num_timesteps - 1,
+        dtype=torch.long,
+    )
+
+    result = zsnr_scheduler.add_noise(latent, noise, timesteps)
+
+    torch.testing.assert_close(result, noise)

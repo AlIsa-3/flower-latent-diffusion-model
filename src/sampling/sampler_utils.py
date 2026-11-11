@@ -16,8 +16,8 @@ def to_derivative(
     return (latent - denoised_latent) / sigma
 
 
-def calc_sigmas(alpha_bars: torch.Tensor) -> torch.Tensor:
-    return torch.sqrt(((1 - alpha_bars) / alpha_bars))
+def calc_sigmas(alpha_bars: torch.Tensor, min_alpha_bar: float = 1e-12) -> torch.Tensor:
+    return torch.sqrt(((1 - alpha_bars) / torch.clamp(alpha_bars, min=min_alpha_bar)))
 
 
 def estimate_clean_vp_latent_from_eps(
@@ -27,9 +27,24 @@ def estimate_clean_vp_latent_from_eps(
 
 
 def calc_denoised_latent(
-    latent: torch.Tensor, sigma: torch.Tensor, eps: torch.Tensor
+    latent: torch.Tensor,
+    sigma: torch.Tensor,
+    prediction: torch.Tensor,
+    prediction_type: Literal["eps", "v"],
 ) -> torch.Tensor:
-    return latent - sigma * eps
+    if prediction_type not in ("eps", "v"):
+        raise ValueError(
+            f"prediction_type must be either 'eps' or 'v', received: {prediction_type}"
+        )
+    if prediction_type == "eps":
+        return latent - sigma * prediction
+    else:
+        vp_latent = convert_from_sigmas(latent, sigma)
+        alpha_bar = 1 / (1 + sigma.square())
+
+        return (
+            torch.sqrt(alpha_bar) * vp_latent - torch.sqrt(1 - alpha_bar) * prediction
+        )
 
 
 def get_ancestral_step(
@@ -42,7 +57,7 @@ def get_ancestral_step(
         (sigma_next**2 * torch.clamp((sigma**2 - sigma_next**2), min=0)) / sigma**2
     )
 
-    sigma_down = sigma_next**2 / sigma
+    sigma_down = torch.sqrt(torch.clamp((sigma_next**2 - sigma_up**2), min=0))
 
     return sigma_down, sigma_up
 
@@ -90,16 +105,9 @@ def sampling_loop(
 
         prediction = unet(vp_latent, timestep)
 
-        if prediction_type == "eps":
-            denoised_latent = calc_denoised_latent(latent, sigma, prediction)
-
-        elif prediction_type == "v":
-            alpha_bar = 1 / (1 + sigma.square())
-
-            denoised_latent = (
-                torch.sqrt(alpha_bar) * vp_latent
-                - torch.sqrt(1 - alpha_bar) * prediction
-            )
+        denoised_latent = calc_denoised_latent(
+            latent, sigma, prediction, prediction_type
+        )
 
         derivative = to_derivative(latent, denoised_latent, sigma)
 

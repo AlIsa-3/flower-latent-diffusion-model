@@ -11,12 +11,15 @@ class CosineNoiseScheduler(nn.Module):
     betas: torch.Tensor
     sigmas: torch.Tensor
 
-    def __init__(self, num_timesteps: int, s: float = 0.008) -> None:
+    def __init__(
+        self, num_timesteps: int, s: float = 0.008, zero_terminal_snr: bool = False
+    ) -> None:
         super().__init__()
+        self.zero_terminal_snr = zero_terminal_snr
         self.num_timesteps = num_timesteps
         self.s = s
 
-        steps = torch.arange(self.num_timesteps + 1, dtype=torch.float32)
+        steps = torch.arange(num_timesteps + 1, dtype=torch.float32)
 
         f = (
             torch.cos(
@@ -36,6 +39,19 @@ class CosineNoiseScheduler(nn.Module):
 
         # Recalculate alpha_bars based on the new alphas
         alpha_bars = torch.cumprod(alphas, dim=0)
+
+        if self.zero_terminal_snr:
+            alpha_bars = self.rescale_zero_terminal_snr(alpha_bars)
+
+            # Reconstruct individual alphas and betas
+            alphas = torch.cat(
+                [
+                    alpha_bars[:1],
+                    alpha_bars[1:] / alpha_bars[:-1],
+                ]
+            )
+
+            betas = 1 - alphas
         sigmas = calc_sigmas(alpha_bars)
 
         # Register so saved with model
@@ -60,6 +76,25 @@ class CosineNoiseScheduler(nn.Module):
         noisy_latents = self._forward_diffusion(latents, alpha_bar, noise)
 
         return noisy_latents
+
+    def rescale_zero_terminal_snr(
+        self,
+        alpha_bars: torch.Tensor,
+    ) -> torch.Tensor:
+        alphas_bar_sqrt = torch.sqrt(alpha_bars)
+
+        # Preserve the first timestep
+        first = alphas_bar_sqrt[0].clone()
+
+        # Shift the final timestep to zero
+        last = alphas_bar_sqrt[-1].clone()
+
+        alphas_bar_sqrt = alphas_bar_sqrt - last
+
+        # Rescale to preserve the original first timestep
+        alphas_bar_sqrt = alphas_bar_sqrt * first / (first - last)
+
+        return alphas_bar_sqrt.square()
 
 
 class SinusoidalTimestepEmbedding(nn.Module):
@@ -96,3 +131,21 @@ def calc_velocity(
     alpha_bar = alpha_bar.reshape(-1, 1, 1, 1)
 
     return torch.sqrt(alpha_bar) * noise - torch.sqrt(1 - alpha_bar) * latents
+
+
+def min_snr_weighting(
+    timesteps: torch.Tensor,
+    scheduler: CosineNoiseScheduler,
+    gamma: float = 5.0,
+) -> torch.Tensor:
+    if gamma <= 0:
+        raise ValueError("gamma must be greater than 0")
+
+    alpha_bar = scheduler.alpha_bars[timesteps]
+
+    # Avoid division by 0
+    snr = alpha_bar / torch.clamp((1.0 - alpha_bar), min=1e-12)
+
+    weights = torch.clamp(snr, max=gamma) / (snr + 1.0)
+
+    return weights
