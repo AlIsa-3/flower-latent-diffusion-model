@@ -266,6 +266,9 @@ class UNet(nn.Module):
             hidden_dimensions, input_latent_channels, kernel_size=(3, 3), padding=1
         )
 
+        nn.init.zeros_(self.output_conv.weight)
+        nn.init.zeros_(self.output_conv.bias)
+
     def forward(self, x: torch.Tensor, timestep: torch.Tensor) -> torch.Tensor:
         height, width = x.shape[-2:]
         if height % 16 != 0 or width % 16 != 0:
