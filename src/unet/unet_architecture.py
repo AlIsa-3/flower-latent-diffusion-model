@@ -2,7 +2,9 @@ import torch.nn as nn
 import torch
 
 from utils.UNetResidualBlock import UNetResidualBlock
+from utils.latent_normalization import LatentNormalizer
 from unet.diffusion_utils import SinusoidalTimestepEmbedding
+from utils.attention import SpatialSelfAttention
 
 
 class TimeStepSequential(nn.Sequential):
@@ -39,23 +41,24 @@ class ConvolutionBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    latent_scaling_factor: torch.Tensor
-
     def __init__(
         self,
         input_latent_channels: int,
         hidden_dimensions: int = 16,
         timestep_embedding_dims: int = 256,
-        latent_scaling_factor: torch.Tensor | None = None,
+        latent_normalizer: LatentNormalizer | None = None,
     ) -> None:
         super().__init__()
 
         if hidden_dimensions % 8 != 0:
             raise ValueError("hidden_dimensions must be divisible by 8")
 
-        if latent_scaling_factor is None:
-            latent_scaling_factor = torch.tensor(1.0, dtype=torch.float32)
-        self.register_buffer("latent_scaling_factor", latent_scaling_factor)
+        # Initialize the normalizer
+        if latent_normalizer is None:
+            latent_normalizer = LatentNormalizer(
+                torch.ones(input_latent_channels), torch.zeros(input_latent_channels)
+            )
+        self.latent_normalizer = latent_normalizer
 
         # Allow model to learn a more useful representation of the timestep embedding
         self.timestep_embedding = nn.Sequential(
@@ -156,6 +159,9 @@ class UNet(nn.Module):
             nn.GroupNorm(num_groups=8, num_channels=hidden_dimensions * 8),
             nn.SiLU(),
         )
+        self.attention_1 = SpatialSelfAttention(
+            channels=hidden_dimensions * 8, num_heads=8, num_groups=8
+        )
 
         self.final_conv = TimeStepSequential(
             ConvolutionBlock(
@@ -168,6 +174,10 @@ class UNet(nn.Module):
                 hidden_dimensions * 16,
                 timestep_embedding_dims=timestep_embedding_dims,
             ),
+        )
+
+        self.attention_2 = SpatialSelfAttention(
+            channels=hidden_dimensions * 16, num_heads=8, num_groups=8
         )
 
         self.first_upscale = nn.Sequential(
@@ -267,7 +277,7 @@ class UNet(nn.Module):
         )
 
         nn.init.zeros_(self.output_conv.weight)
-        nn.init.zeros_(self.output_conv.bias) # type: ignore
+        nn.init.zeros_(self.output_conv.bias)  # type: ignore
 
     def forward(self, x: torch.Tensor, timestep: torch.Tensor) -> torch.Tensor:
         height, width = x.shape[-2:]
@@ -288,7 +298,11 @@ class UNet(nn.Module):
         fourth_layer = self.fourth_conv_down(x, time_embedding)
         x = self.fourth_downscale(fourth_layer)
 
+        x = self.attention_1(x)
+
         x = self.final_conv(x, time_embedding)  # Bottleneck
+
+        x = self.attention_2(x)
 
         x = self.first_upscale(x)
         x = torch.cat([x, fourth_layer], dim=1)

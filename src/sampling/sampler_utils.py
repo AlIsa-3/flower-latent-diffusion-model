@@ -113,4 +113,4 @@ def sampling_loop(
 
         latent = sampler(latent, derivative, sigma, sigma_next)
 
-    return latent / unet.latent_scaling_factor
+    return unet.latent_normalizer.unnormalize(latent)

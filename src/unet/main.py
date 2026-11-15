@@ -6,10 +6,11 @@ import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
 from vae.vae_architecture import VAE
-from vae.vae_utils import vae_preprocess_transforms, calc_scaling_factor
+from vae.vae_utils import vae_preprocess_transforms, calc_shift_scale
 from utils import utils
 from utils.logger import setup_logger
 from utils.ImageLoader import FlattenedImageFolder
+from utils.latent_normalization import LatentNormalizer
 from unet.unet_architecture import UNet
 from unet.diffusion_utils import CosineNoiseScheduler
 from unet.train import training_loop
@@ -28,12 +29,11 @@ def main():
     LR = 1e-4
 
     VAE_INPUT_CHANNELS = 3
-    VAE_HIDDEN_DIMS = 32
-    VAE_LATENT_DIMS = 8
+    VAE_HIDDEN_DIMS = 64
+    VAE_LATENT_DIMS = 32
 
     data_path = pathlib.Path("flattened_dataset/")
-    vae_path = pathlib.Path("models/vae/best_vae.ckpt")
-
+    vae_path = pathlib.Path("models/vae/best_vae_512.ckpt")
     device = utils.device_select()
 
     split_generator = torch.Generator().manual_seed(423)
@@ -63,10 +63,12 @@ def main():
     vae.eval()
 
     # Instantiate U-Net
-    UNET_HIDDEN_DIMS = 16
+    UNET_HIDDEN_DIMS = 32
     UNET_TIMESTEP_EMBEDDING_DIMS = 256
-    LATENT_SCALING_FACTOR = torch.tensor(
-        calc_scaling_factor(vae, train_loader, device=device)
+    LATENT_SHIFT, LATENT_SCALE = torch.tensor(
+        calc_shift_scale(
+            vae, train_loader, device=device, vae_channel_count=VAE_LATENT_DIMS
+        )
     )
 
     logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}_prediction"
@@ -88,13 +90,16 @@ def main():
     logger.info(
         f"VAE Info: VAE Input Channels = {VAE_INPUT_CHANNELS} | VAE Initial Hidden Dimensions = {VAE_HIDDEN_DIMS} | VAE Encoder Output Latent Channels = {VAE_LATENT_DIMS}"
     )
-    logger.info(f"Latent Scaling Factor: {LATENT_SCALING_FACTOR:.5f}")
+    logger.info(
+        f"Latent Scaling Shift: {LATENT_SHIFT:.5f} | Latent Scale Factor : {LATENT_SCALE:.5f}"
+    )
 
+    normalizer = LatentNormalizer(LATENT_SCALE, LATENT_SHIFT)
     unet = UNet(
         input_latent_channels=VAE_LATENT_DIMS,
         hidden_dimensions=UNET_HIDDEN_DIMS,
         timestep_embedding_dims=UNET_TIMESTEP_EMBEDDING_DIMS,
-        latent_scaling_factor=LATENT_SCALING_FACTOR,
+        latent_normalizer=normalizer,
     ).to(device)
 
     # Instantiate Noise Scheduler
@@ -112,8 +117,8 @@ def main():
     early_stop = utils.EarlyStop(
         patience=25,
         min_delta=0.001,
-        checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}.ckpt",
-        latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}.ckpt",
+        checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}_512.ckpt",
+        latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}_512.ckpt",
     )
 
     training_loop(

@@ -12,7 +12,7 @@ from utils.logger import get_null_logger
 from vae.vae_architecture import VAE
 
 from unet.unet_architecture import UNet
-from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity, min_snr_weighting
+from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity
 from inference.inference import Inference
 
 type TrainingLosses = tuple[list[float], list[float]]
@@ -29,25 +29,24 @@ def inference_while_training(
         steps,
         seed,
         image_name=f"epoch_images/Epoch_{current_epoch}",
+        latent_size=(32, 64, 64),
         starting_timestep=scheduler.num_timesteps,
         debug=True,
     )
 
 
 @torch.no_grad()
-def encode_images(
-    images: torch.Tensor, vae: VAE, scaling_factor: torch.Tensor
-) -> torch.Tensor:
+def encode_images(images: torch.Tensor, vae: VAE, unet: UNet) -> torch.Tensor:
     mu, logvar = vae.encode(images)
     z = vae.reparameterize(mu, logvar)
 
-    return z * scaling_factor
+    return unet.latent_normalizer.normalize(z)
 
 
 @torch.no_grad()
 def prepare_validation_data(
     vae: VAE,
-    scaling_factor: torch.Tensor,
+    unet: UNet,
     scheduler: CosineNoiseScheduler,
     val_loader: data.DataLoader,
     device: Literal["cuda", "mps", "cpu"],
@@ -66,7 +65,7 @@ def prepare_validation_data(
         batch = batch.to(device)
         current_batch_size = batch.size(0)
 
-        latents = encode_images(batch, vae, scaling_factor)
+        latents = encode_images(batch, vae, unet)
 
         noise = torch.randn_like(latents)
 
@@ -133,7 +132,7 @@ def train(
         batch_size = batch.size(0)
         optimizer.zero_grad(set_to_none=True)
         # Encode Images
-        latents = encode_images(batch, vae, unet.latent_scaling_factor)
+        latents = encode_images(batch, vae, unet)
 
         # Add Noise
         time_steps = torch.randint(
@@ -153,20 +152,6 @@ def train(
 
         # Calculate per-element loss
         loss = criterion(predictions, target)
-
-        # Average over channels and spatial dimensions
-        per_sample_loss = loss.mean(dim=(1, 2, 3))
-
-        # Calculate Min-SNR weights
-        weights = min_snr_weighting(
-            time_steps,
-            scheduler,
-            gamma=5.0,
-        )
-
-        # Apply weights and average across batch
-
-        loss = (per_sample_loss * weights).mean()
         loss.backward()
         training_loss += loss.item() * batch_size
         num_samples += batch_size
@@ -285,9 +270,7 @@ def training_loop(
         raise ValueError(
             f"Unsupported prediction type, supported = (eps,v), received = {prediction_type}"
         )
-    val_loader = prepare_validation_data(
-        vae, unet.latent_scaling_factor, scheduler, val_loader, device
-    )
+    val_loader = prepare_validation_data(vae, unet, scheduler, val_loader, device)
     epoch_training_losses = []
     epoch_val_losses = []
     logger.info(f"Beginning Training with {num_epochs} epochs")
