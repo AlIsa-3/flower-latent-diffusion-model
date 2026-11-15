@@ -11,7 +11,6 @@ hidden_dimensions = 16
 LATENT_DIMENSIONS = 4
 
 
-
 @pytest.fixture()
 def model():
     return VAE(
@@ -33,11 +32,14 @@ def test_vae_reconstruction_dimensions(model):
     assert (
         mu.shape == logvar.shape
     ), f"Mu and logvar don't have the same shape| mu: {mu.shape}, logvar: {logvar.shape}"
-    assert mu.shape == (
-        1,
-        LATENT_DIMENSIONS,
-        BOTTLENECK_SIZE,
-        BOTTLENECK_SIZE,
+    assert (
+        mu.shape
+        == (
+            1,
+            LATENT_DIMENSIONS,
+            BOTTLENECK_SIZE,
+            BOTTLENECK_SIZE,
+        )
     ), f"Mu shape is not (1,{LATENT_DIMENSIONS},{BOTTLENECK_SIZE},{BOTTLENECK_SIZE}), got {mu.shape}"
 
 
@@ -46,11 +48,14 @@ def test_vae_mu_dimensions(model):
 
     # Get model output
     reconstruction, mu, logvar = model(model_input)
-    assert mu.shape == (
-        1,
-        LATENT_DIMENSIONS,
-        BOTTLENECK_SIZE,
-        BOTTLENECK_SIZE,
+    assert (
+        mu.shape
+        == (
+            1,
+            LATENT_DIMENSIONS,
+            BOTTLENECK_SIZE,
+            BOTTLENECK_SIZE,
+        )
     ), f"Mu shape is not (1,{LATENT_DIMENSIONS},{BOTTLENECK_SIZE},{BOTTLENECK_SIZE}), got {mu.shape}"
 
 
