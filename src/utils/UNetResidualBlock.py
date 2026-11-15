@@ -11,9 +11,6 @@ class UNetResidualBlock(ResidualBlock):
             channels=channels, embedding_dims=time_embedding_dimensions, num_groups=8
         )
 
-        nn.init.zeros_(self.conv2.weight)
-        nn.init.zeros_(self.conv2.bias)  # type: ignore
-
     # Add default time_embedding to avoid typing warning
     def forward(
         self, x: torch.Tensor, time_embedding: torch.Tensor | None = None
@@ -22,16 +19,12 @@ class UNetResidualBlock(ResidualBlock):
             raise ValueError("time_embedding is required")
         residual = x
         x = self.conv1(x)
-        x = self.groupNorm1(x)
-        x = self.activation(x)
-
         # Add time embedding
         x = self.adagn(x, time_embedding)
+        x = self.activation(x)
 
         x = self.conv2(x)
-        x = self.groupNorm2(x)
         x = x + residual
-        x = self.activation(x)
 
         return x
 

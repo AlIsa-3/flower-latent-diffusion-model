@@ -1,6 +1,7 @@
 import logging
 import pathlib
 from datetime import datetime
+import sys
 
 
 def get_null_logger() -> logging.Logger:
@@ -13,6 +14,7 @@ def setup_logger(
     filename: str = "training",
     log_dir: str | pathlib.Path = "logs",
     level: int = logging.INFO,
+    stdout: bool = False,
 ) -> logging.Logger:
     log_dir = pathlib.Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -45,5 +47,7 @@ def setup_logger(
 
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+    if stdout:
+        logger.addHandler(logging.StreamHandler(sys.stdout))
 
     return logger
