@@ -91,7 +91,7 @@ def main():
         f"VAE Info: VAE Input Channels = {VAE_INPUT_CHANNELS} | VAE Initial Hidden Dimensions = {VAE_HIDDEN_DIMS} | VAE Encoder Output Latent Channels = {VAE_LATENT_DIMS} | VAE Image Size = {ORIGINAL_IMAGE_SIZE}"
     )
     logger.info(
-        f"Latent Scaling Shift: {LATENT_SHIFT:.5f} | Latent Scale Factor : {LATENT_SCALE:.5f}"
+        f"Latent Scaling Shift: {LATENT_SHIFT.cpu()}\nLatent Scale Factor : {LATENT_SCALE.cpu()}"
     )
 
     normalizer = LatentNormalizer(LATENT_SCALE, LATENT_SHIFT)
