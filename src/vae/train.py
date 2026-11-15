@@ -10,6 +10,7 @@ from vae.VAELoss import VAELoss
 from vae.vae_utils import kl_per_channel
 from utils.logger import get_null_logger
 from utils.utils import EarlyStop
+from utils.visualization import visualize_vae
 
 from typing import Literal
 
@@ -219,6 +220,16 @@ def training_loop(
         )
 
         logger.info(early_stop.status())
+
+        if epoch % 5 == 0:
+            mu, logvar = model.encode(val_data.dataset[0].unsqueeze(0).to(device))
+            reconstruction = model.decode(mu)
+            visualize_vae(
+                val_data.dataset[0],
+                reconstruction.detach().squeeze(0).cpu().numpy(),
+                figure_name=f"reconstruction_epoch_{epoch}",
+                figure_directory="512_vae",
+            )
 
         if should_stop:
             logger.info(f"Early stopping triggered at epoch {epoch+1}")

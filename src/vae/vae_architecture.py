@@ -8,7 +8,7 @@ class VAE(nn.Module):
         self, input_channels: int, hidden_dimensions: int, latent_dimensions: int = 4
     ) -> None:
         super().__init__()
-
+        # Input Size
         self.encoder = nn.Sequential(
             nn.Conv2d(
                 in_channels=input_channels,
@@ -20,7 +20,7 @@ class VAE(nn.Module):
             nn.SiLU(),
             ResidualBlock(hidden_dimensions),
             ResidualBlock(hidden_dimensions),
-            # 128x128
+            # Downscale by 2
             nn.Conv2d(
                 in_channels=hidden_dimensions,
                 out_channels=hidden_dimensions * 2,
@@ -31,7 +31,7 @@ class VAE(nn.Module):
             nn.SiLU(),
             ResidualBlock(hidden_dimensions * 2),
             ResidualBlock(hidden_dimensions * 2),
-            # 64x64
+            # Downscale by 4
             nn.Conv2d(
                 in_channels=hidden_dimensions * 2,
                 out_channels=hidden_dimensions * 4,
@@ -42,7 +42,7 @@ class VAE(nn.Module):
             nn.SiLU(),
             ResidualBlock(hidden_dimensions * 4),
             ResidualBlock(hidden_dimensions * 4),
-            # 32x32
+            # Downscale by 8
         )
         # Convert Encoded Data to mu and logvar
         self.to_mu = nn.Conv2d(
@@ -61,9 +61,9 @@ class VAE(nn.Module):
         )
 
         self.decoder = nn.Sequential(
-            # 32x32
             ResidualBlock(hidden_dimensions * 4),
             ResidualBlock(hidden_dimensions * 4),
+            # Upscale by 2
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions * 4,
                 out_channels=hidden_dimensions * 2,
@@ -74,7 +74,7 @@ class VAE(nn.Module):
             nn.SiLU(),
             ResidualBlock(hidden_dimensions * 2),
             ResidualBlock(hidden_dimensions * 2),
-            # 64x64
+            # Upscale by 4
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions * 2,
                 out_channels=hidden_dimensions,
@@ -85,7 +85,7 @@ class VAE(nn.Module):
             nn.SiLU(),
             ResidualBlock(hidden_dimensions),
             ResidualBlock(hidden_dimensions),
-            # 128x128
+            # Upscale by 8
             nn.ConvTranspose2d(
                 in_channels=hidden_dimensions,
                 out_channels=input_channels,
@@ -93,7 +93,7 @@ class VAE(nn.Module):
                 stride=2,
             ),
             nn.Tanh(),  # Output Data Normalized to [-1,1]
-            # 256x256
+            # Original Size
         )
 
     def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

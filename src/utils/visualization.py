@@ -36,6 +36,7 @@ def visualize_vae(
     fig.suptitle(figure_name)
     figure_path = figure_directory / f"{figure_name}.{ext}"
     fig.savefig(str(figure_path), dpi=100)
+    plt.close(fig)
 
 
 def visualize_vae_generations(
@@ -52,9 +53,7 @@ def visualize_vae_generations(
             for column in range(20):
                 noise = torch.randn(vae_latent_shape).unsqueeze(0).to(device)
                 generation = vae.decode(noise).squeeze(0).cpu()
-                ax[row, column].imshow(
-                    unNormalize(np.transpose(generation, (1, 2, 0)), 0.5, 0.5)
-                )
+                ax[row, column].imshow(generation_to_numpy(generation))
                 ax[row, column].axis("off")
     fig.savefig(f"{figure_filename}.{ext}")
     plt.close(fig)
@@ -111,11 +110,11 @@ def visualize_unet_generations(
 def visualize_unet_generation(decoded_image, figsize, file_path, file_ext: str = "jpg"):
     pathlib.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=figsize, layout="constrained")
-    ax.imshow(unet_generation_to_numpy(decoded_image))
+    ax.imshow(generation_to_numpy(decoded_image))
     fig.savefig(f"{file_path}.{file_ext}")
 
 
-def unet_generation_to_numpy(decoded_image):
+def generation_to_numpy(decoded_image):
     return unNormalize(
         np.transpose(decoded_image.detach().cpu().squeeze(0).numpy(), (1, 2, 0)),
         0.5,
@@ -124,7 +123,7 @@ def unet_generation_to_numpy(decoded_image):
 
 
 def image_to_uint8(decoded_image):
-    image = unet_generation_to_numpy(decoded_image)
+    image = generation_to_numpy(decoded_image)
     image = np.clip(image, 0, 1)
     image = (image * 255).round().astype(np.uint8)
     return image

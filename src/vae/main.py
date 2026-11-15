@@ -18,6 +18,8 @@ def main():
 
     # Training Params
     NUM_EPOCHS = 500
+    # Assumes Square Images
+    IMAGE_RESOLUTION = 512
 
     # Random Generators
     RANDOM_SEED = 423
@@ -27,8 +29,8 @@ def main():
 
     # VAE Params
     NUM_INPUT_CHANNELS = 3
-    NUM_HIDDEN_DIM = 32
-    NUM_LATENT_DIM = 8
+    NUM_HIDDEN_DIM = 64
+    NUM_LATENT_DIM = 32
 
     # Optimizer Params
     LR = 0.001
@@ -37,21 +39,26 @@ def main():
     LOSS_BETA = 1
 
     # Early Stop Params
-    CHECKPOINT_PATH = pathlib.Path("models/vae/best_vae.ckpt")
-    LATEST_CHECKPOINT_PATH = pathlib.Path("models/vae/latest_vae.ckpt")
+    CHECKPOINT_PATH = pathlib.Path(f"models/vae/best_vae_{IMAGE_RESOLUTION}.ckpt")
+    LATEST_CHECKPOINT_PATH = pathlib.Path(
+        f"models/vae/latest_vae_{IMAGE_RESOLUTION}.ckpt"
+    )
     EARLY_STOP_PATIENCE = 10
     EARLY_STOP_MIN_DELTA = 100
 
     BATCH_SIZE = 8
     logger = setup_logger(
-        f"hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}"
+        f"VAE_hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}_resolution_{IMAGE_RESOLUTION}"
     )
+
     path = pathlib.Path("flattened_dataset")
     dataset = FlattenedImageFolder(path, transform=vae_preprocess_transforms)
 
     train_data, val_data, test_data = data.random_split(
         dataset, lengths=[0.8, 0.1, 0.1], generator=split_generator
     )
+    logger.info(f"Training with square images with size {IMAGE_RESOLUTION}")
+    logger.info(f"Train Size: {len(train_data)} | Val Size {len(val_data)}")
     train_loader = data.DataLoader(
         train_data,
         batch_size=BATCH_SIZE,
@@ -65,8 +72,8 @@ def main():
         hidden_dimensions=NUM_HIDDEN_DIM,
         latent_dimensions=NUM_LATENT_DIM,
     ).to(device)
-    criterion = VAELoss(beta=LOSS_BETA).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    criterion = VAELoss(beta=LOSS_BETA, reconstruction_loss="mae").to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=LR)
 
     early_stop = utils.EarlyStop(
         patience=EARLY_STOP_PATIENCE,
