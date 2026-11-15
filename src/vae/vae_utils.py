@@ -27,8 +27,10 @@ def displayOriginal(image, mean=0.5, std=0.5):
     ax.imshow(np.transpose(unNormalize(image, mean, std), (1, 2, 0)))
 
 
+@torch.inference_mode()
 def calc_shift_scale(vae: VAE, dataset, device, vae_channel_count):
     vae = vae.to(device)
+    vae.eval()
 
     num_pixels = 0
     channel_sum = torch.zeros(vae_channel_count, device=device, dtype=torch.float32)
