@@ -21,6 +21,8 @@ def main():
     setup_start = time.perf_counter()
     # Choose prediction type (eps vs v)
     PREDICTION_TARGET: Literal["eps", "v"] = "v"
+    # For selecting the VAE
+    ORIGINAL_IMAGE_SIZE = 512
 
     SEED = 235
     torch.manual_seed(SEED)
@@ -33,7 +35,7 @@ def main():
     VAE_LATENT_DIMS = 32
 
     data_path = pathlib.Path("flattened_dataset/")
-    vae_path = pathlib.Path("models/vae/best_vae_512.ckpt")
+    vae_path = pathlib.Path(f"models/vae/best_vae_{ORIGINAL_IMAGE_SIZE}.ckpt")
     device = utils.device_select()
 
     split_generator = torch.Generator().manual_seed(423)
@@ -88,7 +90,7 @@ def main():
     logger.info(f"Learning rate: {LR}")
     logger.info(f"VAE Checkpoint: {vae_path}")
     logger.info(
-        f"VAE Info: VAE Input Channels = {VAE_INPUT_CHANNELS} | VAE Initial Hidden Dimensions = {VAE_HIDDEN_DIMS} | VAE Encoder Output Latent Channels = {VAE_LATENT_DIMS}"
+        f"VAE Info: VAE Input Channels = {VAE_INPUT_CHANNELS} | VAE Initial Hidden Dimensions = {VAE_HIDDEN_DIMS} | VAE Encoder Output Latent Channels = {VAE_LATENT_DIMS} | VAE Image Size = {ORIGINAL_IMAGE_SIZE}"
     )
     logger.info(
         f"Latent Scaling Shift: {LATENT_SHIFT:.5f} | Latent Scale Factor : {LATENT_SCALE:.5f}"
@@ -117,8 +119,8 @@ def main():
     early_stop = utils.EarlyStop(
         patience=25,
         min_delta=0.001,
-        checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}_512.ckpt",
-        latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}_512.ckpt",
+        checkpoint_path=f"models/unet/best_unet_{PREDICTION_TARGET}_{ORIGINAL_IMAGE_SIZE}.ckpt",
+        latest_checkpoint_path=f"models/unet/latest_unet_{PREDICTION_TARGET}_{ORIGINAL_IMAGE_SIZE}.ckpt",
     )
 
     training_loop(
