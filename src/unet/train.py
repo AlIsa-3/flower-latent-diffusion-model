@@ -28,7 +28,7 @@ def inference_while_training(
     inference.sample(
         steps,
         seed,
-        image_name=f"epoch_images/Epoch_{current_epoch}",
+        image_name=f"epoch_images/Epoch_{current_epoch}_{prediction_type}",
         latent_size=(32, 64, 64),
         starting_timestep=scheduler.num_timesteps,
         debug=True,

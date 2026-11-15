@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import torch
 from vae.vae_architecture import VAE
 import torchvision.transforms.v2 as v2
+from typing import Literal
 
 # VAE Preprocessing Transforms
 IMAGE_SIZE = 512
@@ -28,7 +29,12 @@ def displayOriginal(image, mean=0.5, std=0.5):
 
 
 @torch.inference_mode()
-def calc_shift_scale(vae: VAE, dataset, device, vae_channel_count):
+def calc_shift_scale(
+    vae: VAE,
+    dataset: torch.utils.data.DataLoader,
+    device: Literal["cuda", "mps", "cpu"],
+    vae_channel_count: int,
+):
     vae = vae.to(device)
     vae.eval()
 

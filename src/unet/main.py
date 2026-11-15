@@ -20,7 +20,7 @@ from typing import Literal
 def main():
     setup_start = time.perf_counter()
     # Choose prediction type (eps vs v)
-    PREDICTION_TARGET: Literal["eps", "v"] = "v"
+    PREDICTION_TARGET: Literal["eps", "v"] = "eps"
     # For selecting the VAE
     ORIGINAL_IMAGE_SIZE = 512
 
@@ -67,10 +67,8 @@ def main():
     # Instantiate U-Net
     UNET_HIDDEN_DIMS = 32
     UNET_TIMESTEP_EMBEDDING_DIMS = 256
-    LATENT_SHIFT, LATENT_SCALE = torch.tensor(
-        calc_shift_scale(
-            vae, train_loader, device=device, vae_channel_count=VAE_LATENT_DIMS
-        )
+    LATENT_SHIFT, LATENT_SCALE = calc_shift_scale(
+        vae, train_loader, device=device, vae_channel_count=VAE_LATENT_DIMS
     )
 
     logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}_prediction"
