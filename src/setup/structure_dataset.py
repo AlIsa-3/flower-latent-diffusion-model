@@ -23,5 +23,6 @@ def flatten_directory(
 
 
 if __name__ == "__main__":
-    PATH = "../../oxford_flowers/dataset"
+    # When running from the root directory --> src/setup/structure_dataset.py
+    PATH = "oxford_flowers/dataset"
     flatten_directory(pathlib.Path(PATH), pathlib.Path("flattened_dataset"))
