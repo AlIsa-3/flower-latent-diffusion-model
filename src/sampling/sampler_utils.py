@@ -37,7 +37,7 @@ def calc_denoised_latent(
             f"prediction_type must be either 'eps' or 'v', received: {prediction_type}"
         )
     if prediction_type == "eps":
-        return latent - sigma * prediction
+        return latent - (sigma * prediction)
     else:
         vp_latent = convert_from_sigmas(latent, sigma)
         alpha_bar = 1 / (1 + sigma.square())
