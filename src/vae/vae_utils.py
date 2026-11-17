@@ -6,7 +6,7 @@ import torchvision.transforms.v2 as v2
 from typing import Literal
 
 # VAE Preprocessing Transforms
-IMAGE_SIZE = 512
+IMAGE_SIZE = 256
 vae_preprocess_transforms = v2.Compose(
     [
         v2.ToImage(),

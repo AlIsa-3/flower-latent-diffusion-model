@@ -12,7 +12,7 @@ from utils.logger import get_null_logger
 from vae.vae_architecture import VAE
 
 from unet.unet_architecture import UNet
-from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity
+from unet.diffusion_utils import CosineNoiseScheduler, calc_velocity, min_snr_weighting
 from inference.inference import Inference
 
 type TrainingLosses = tuple[list[float], list[float]]
@@ -29,8 +29,8 @@ def inference_while_training(
         steps,
         seed,
         image_name=f"epoch_images/Epoch_{current_epoch}_{prediction_type}",
-        latent_size=(32, 64, 64),
-        starting_timestep=scheduler.num_timesteps,
+        latent_size=(16, 32, 32),
+        starting_timestep=1000,
         debug=True,
     )
 
@@ -150,8 +150,15 @@ def train(
         elif prediction_type == "v":
             target = calc_velocity(latents, noise, time_steps, scheduler)
 
-        # Calculate per-element loss
-        loss = criterion(predictions, target)
+        # Calculate per-element loss, keeping batch dimension
+        loss = criterion(predictions, target).mean(dim=(1, 2, 3))
+        # Apply min SNR weighting to v-prediction
+        if prediction_type == "v":
+            weights = min_snr_weighting(time_steps, scheduler, gamma=5)
+            loss *= weights
+
+        # Average over batch dimension
+        loss = loss.mean()
         loss.backward()
         training_loss += loss.item() * batch_size
         num_samples += batch_size
@@ -234,7 +241,7 @@ def validate(
             elif prediction_type == "v":
                 target = calc_velocity(latents, noises, timesteps, scheduler)
 
-            loss = criterion(predictions, target)
+            loss = criterion(predictions, target).mean()
             val_loss += loss.item() * current_batch_size
             num_samples += current_batch_size
 

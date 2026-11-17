@@ -19,7 +19,7 @@ def main():
     # Training Params
     NUM_EPOCHS = 500
     # Assumes Square Images
-    IMAGE_RESOLUTION = 512
+    IMAGE_RESOLUTION = 256
 
     # Random Generators
     RANDOM_SEED = 423
@@ -29,8 +29,8 @@ def main():
 
     # VAE Params
     NUM_INPUT_CHANNELS = 3
-    NUM_HIDDEN_DIM = 64
-    NUM_LATENT_DIM = 32
+    NUM_HIDDEN_DIM = 32
+    NUM_LATENT_DIM = 16
 
     # Optimizer Params
     LR = 0.001
@@ -46,9 +46,10 @@ def main():
     EARLY_STOP_PATIENCE = 10
     EARLY_STOP_MIN_DELTA = 100
 
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
     logger = setup_logger(
-        f"VAE_hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}_resolution_{IMAGE_RESOLUTION}"
+        f"VAE_hidden_dim_{NUM_HIDDEN_DIM}_latent_dim_{NUM_LATENT_DIM}_lr_{LR}_beta_{LOSS_BETA}_resolution_{IMAGE_RESOLUTION}",
+        stdout=True,
     )
 
     path = pathlib.Path("flattened_dataset")

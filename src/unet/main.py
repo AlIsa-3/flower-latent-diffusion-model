@@ -20,9 +20,11 @@ from typing import Literal
 def main():
     setup_start = time.perf_counter()
     # Choose prediction type (eps vs v)
-    PREDICTION_TARGET: Literal["eps", "v"] = "eps"
+    PREDICTION_TARGET: Literal["eps", "v"] = "v"
+    # Use ZSNR if using v prediction, otherwise false
+    ZSNR = PREDICTION_TARGET == "v"
     # For selecting the VAE
-    ORIGINAL_IMAGE_SIZE = 512
+    ORIGINAL_IMAGE_SIZE = 256
 
     SEED = 235
     torch.manual_seed(SEED)
@@ -31,8 +33,8 @@ def main():
     LR = 1e-4
 
     VAE_INPUT_CHANNELS = 3
-    VAE_HIDDEN_DIMS = 64
-    VAE_LATENT_DIMS = 32
+    VAE_HIDDEN_DIMS = 32
+    VAE_LATENT_DIMS = 16
 
     data_path = pathlib.Path("flattened_dataset/")
     vae_path = pathlib.Path(f"models/vae/best_vae_{ORIGINAL_IMAGE_SIZE}.ckpt")
@@ -72,11 +74,12 @@ def main():
     )
 
     logs_filename = f"U-Net_HiddenDims_{UNET_HIDDEN_DIMS}_LatentInputDims_{VAE_LATENT_DIMS}_LR_{LR}_TimeEmbeddingDims_{UNET_TIMESTEP_EMBEDDING_DIMS}_{PREDICTION_TARGET}_prediction"
-    logger = setup_logger(filename=logs_filename)
+    logger = setup_logger(filename=logs_filename, stdout=True)
     if PREDICTION_TARGET == "eps":
         logger.info("Running training with epsilon prediction")
     elif PREDICTION_TARGET == "v":
         logger.info("Running training with v prediction")
+        logger.info("Using min-snr gamma weighting")
     setup_finish = time.perf_counter()
     logger.info(f"Setup Time Taken: {setup_finish-setup_start:.5f}s")
     logger.info(
@@ -105,14 +108,14 @@ def main():
     # Instantiate Noise Scheduler
     NUM_TIMESTEPS = 1000
     scheduler = CosineNoiseScheduler(
-        num_timesteps=NUM_TIMESTEPS, s=0.008, zero_terminal_snr=True
+        num_timesteps=NUM_TIMESTEPS, s=0.008, zero_terminal_snr=ZSNR
     ).to(device)
     logger.info(
         f"Noise Scheduler: {scheduler._get_name()} | Num Training Time-Steps: {NUM_TIMESTEPS} | s = {scheduler.s} | ZSNR: {scheduler.zero_terminal_snr}"
     )
 
     # Instantiate Optimizer and Criterion
-    criterion = nn.MSELoss().to(device)
+    criterion = nn.MSELoss(reduction="none").to(device)
     optimizer = optim.AdamW(unet.parameters(), lr=LR, weight_decay=1e-4)
     early_stop = utils.EarlyStop(
         patience=25,
