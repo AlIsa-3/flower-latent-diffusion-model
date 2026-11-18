@@ -3,10 +3,10 @@ requires = ["setuptools>=80.4.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simple-diffusion-model"
-description = "Trying to create a diffusion model from scratch"
+name = "flower-latent-diffusion-model"
+description = "A PyTorch Latent Diffusion Model trained on the Oxford Flowers 102 Dataset"
 requires-python = ">=3.12"
-dependencies = ["torch","torchvision","numpy","matplotlib","pillow","ipykernel"]
+dependencies = ["torch","torchvision","numpy","matplotlib","pillow"]
 readme = "README.md"
 
 dynamic = ["version"]

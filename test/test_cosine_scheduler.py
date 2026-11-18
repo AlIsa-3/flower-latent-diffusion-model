@@ -68,7 +68,7 @@ def test_forward_diffusion_alpha_bar_zero(scheduler):
     noised_latent = scheduler._forward_diffusion(latent, alpha_bar, noise)
     assert (
         noised_latent == noise
-    ).all(), f"with alpha_bar 0, the noised latent should equal the noise"
+    ).all(), "with alpha_bar 0, the noised latent should equal the noise"
 
 
 def test_forward_diffusion_alpha_bar_1(scheduler):
@@ -79,7 +79,7 @@ def test_forward_diffusion_alpha_bar_1(scheduler):
     noised_latent = scheduler._forward_diffusion(latent, alpha_bar, noise)
     assert (
         noised_latent == latent
-    ).all(), f"With alpha_bar 1, the noised latent should equal the original latent"
+    ).all(), "With alpha_bar 1, the noised latent should equal the original latent"
 
 
 def test_forward_diffusion(scheduler):
