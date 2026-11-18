@@ -31,6 +31,7 @@ One potential cause of the difficulty in reconstruction was the size of the mode
 For the 512x512 VAE, the model was trained using mean square loss, unlike in the 256x256 VAE, however it had the same model architecture. In order to try and mitigate the issues of not having enough model capacity, the number of latent channels was increased to 32, paired with the same 8x downscaling factor, this VAE had a latent representation of $(32,64,64)$.
 
 Due to using mean square loss, the model learned to produce blurry representations rather than sharp details, an example of which is shown here:
+
 <img src=training_images/vae/512_reconstruction.png height=800>
 
 
@@ -41,6 +42,7 @@ Latent Diffusion Model U-Nets were trained using both an epsilon prediction and 
 ### 256x256 U-Net
 
 An LDM U-Net was trained using both VAEs. Originally an epsilon prediction model was trained on the 256x256 VAE, however this implementation did not use self-attention, and did not share the architecture of the later U-Nets. Near the end, all models were retrained to use the same architecture. Below are a few samples of generations from the initial epsilon prediction model:
+
 <img src=training_images/unet/eps_256x256.jpg width=500>
 
 Originally the model did not produce coherent outputs, as can be seen here: 
