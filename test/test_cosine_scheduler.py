@@ -129,4 +129,4 @@ def test_zero_snr_terminal_add_noise(zsnr_scheduler):
 
     result = zsnr_scheduler.add_noise(latent, noise, timesteps)
 
-    torch.testing.assert_close(result, noise)
+    assert torch.allclose(result, noise)
