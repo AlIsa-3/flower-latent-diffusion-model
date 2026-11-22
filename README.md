@@ -199,9 +199,9 @@ KID:
 
 <div align='justify'>
 
-For the FID score, lower values are better, with the best possible score being $0$. The v-prediction model scoring $\approx 140$ while the epsilon-prediction model scores $\approx 202$ clearly indicates that the v-prediction model's generations are closer in distribution to true images of flowers (v-prediction FID is $\approx 30.7\%$ lower than epsilon-prediction).  
+For the FID score, lower values are better, with the best possible score being $0$. The v-prediction model scoring $\approx 140$ while the epsilon-prediction model scores $\approx 202$ clearly indicates that the v-prediction model's generations are closer in distribution to true images of flowers (v-prediction FID is $\approx 30.7\\%$ lower than epsilon-prediction).  
 
-For the KID score, the ideal population KID Mean is also $0$. The v-prediction model clearly performs better than the epsilon-prediction model, with $0.1307\pm 0.0115$ compared to $0.2201 \pm 0.0134$, this is an $\approx 40.6\%$ reduction from the epsilon-prediction model.
+For the KID score, the ideal population KID Mean is also $0$. The v-prediction model clearly performs better than the epsilon-prediction model, with $0.1307\pm 0.0115$ compared to $0.2201 \pm 0.0134$, this is an $ \approx 40.6\\%$ reduction from the epsilon-prediction model.
 
 Both metrics indicate that the v-prediction model performs better than the epsilon-prediction model in this experiment. This agreement provides additional support for this ranking, although both rely on Inception features.
 </div>
